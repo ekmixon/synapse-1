@@ -171,8 +171,8 @@ class EventsWorkerStore(SQLBaseStore):
             max_size=hs.config.caches.event_cache_size,
         )
 
-        # Map from event ID to a deferred tat will result in an
-        # Optional[_EventCacheEntry].
+        # Map from event ID to a deferred that will result in an
+        # Dict[str, _EventCacheEntry].
         self._current_event_fetches: Dict[str, ObservableDeferred] = {}
 
         # We keep track of the events we have currently loaded in memory so that
@@ -542,7 +542,8 @@ class EventsWorkerStore(SQLBaseStore):
                 # deferred to the the map of events that are being fetched.
                 self._current_event_fetches[event_id] = fetching_deferred
                 fetching_deferred.observe().addBoth(
-                    lambda _: self._current_event_fetches.pop(event_id, None)
+                    lambda _, event_id: self._current_event_fetches.pop(event_id, None),
+                    event_id,
                 )
 
         missing_events_ids.difference_update(already_fetching)
