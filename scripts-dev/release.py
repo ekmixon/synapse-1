@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""An interactive script for doing a release. See `run()` below.
+"""An interactive script for doing a release. See `cli()` below.
 """
 
 import re
@@ -40,6 +40,16 @@ def cli():
 
         pip install -e .[dev]
 
+    Then to use:
+
+        ./scripts-dev/release.py prepare
+
+        # ... ask others to look at the changelog ...
+
+        ./scripts-dev/release.py tag
+
+    If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the `tag`
+    command, then a new draft release will be created.
     """
 
 
