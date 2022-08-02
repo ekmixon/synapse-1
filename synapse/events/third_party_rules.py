@@ -74,19 +74,16 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
             # a boolean or a dict, but now we want to return the dict separately from the
             # boolean.
             async def wrap_check_event_allowed(
-                event: EventBase,
-                state_events: StateMap[EventBase],
-            ) -> Tuple[bool, Optional[dict]]:
+                            event: EventBase,
+                            state_events: StateMap[EventBase],
+                        ) -> Tuple[bool, Optional[dict]]:
                 # We've already made sure f is not None above, but mypy doesn't do well
                 # across function boundaries so we need to tell it f is definitely not
                 # None.
                 assert f is not None
 
                 res = await f(event, state_events)
-                if isinstance(res, dict):
-                    return True, res
-                else:
-                    return res, None
+                return (True, res) if isinstance(res, dict) else (res, None)
 
             return wrap_check_event_allowed
 
@@ -323,8 +320,6 @@ class ThirdPartyEventRules:
         state_ids = await self.store.get_filtered_current_state_ids(room_id)
         room_state_events = await self.store.get_events(state_ids.values())
 
-        state_events = {}
-        for key, event_id in state_ids.items():
-            state_events[key] = room_state_events[event_id]
-
-        return state_events
+        return {
+            key: room_state_events[event_id] for key, event_id in state_ids.items()
+        }

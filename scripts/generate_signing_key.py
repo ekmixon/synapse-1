@@ -31,6 +31,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    key_id = "a_" + random_string(4)
+    key_id = f"a_{random_string(4)}"
     key = (generate_signing_key(key_id),)
     write_signing_keys(args.output_file, key)

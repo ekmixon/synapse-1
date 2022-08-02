@@ -149,19 +149,16 @@ class KeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        if device_id is not None:
-            # passing the device_id here is deprecated; however, we allow it
-            # for now for compatibility with older clients.
-            if requester.device_id is not None and device_id != requester.device_id:
-                logger.warning(
-                    "Client uploading keys for a different device "
-                    "(logged in as %s, uploading for %s)",
-                    requester.device_id,
-                    device_id,
-                )
-        else:
+        if device_id is None:
             device_id = requester.device_id
 
+        elif requester.device_id is not None and device_id != requester.device_id:
+            logger.warning(
+                "Client uploading keys for a different device "
+                "(logged in as %s, uploading for %s)",
+                requester.device_id,
+                device_id,
+            )
         if device_id is None:
             raise SynapseError(
                 400, "To upload keys, you must pass device_id when authenticating"
@@ -316,11 +313,11 @@ class GenericWorkerServer(HomeServer):
 
                     groups.register_servlets(self, resource)
 
-                    resources.update({CLIENT_API_PREFIX: resource})
+                    resources[CLIENT_API_PREFIX] = resource
 
-                    resources.update(build_synapse_client_resource_tree(self))
+                    resources |= build_synapse_client_resource_tree(self)
                 elif name == "federation":
-                    resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(self)
                 elif name == "media":
                     if self.config.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
@@ -347,13 +344,10 @@ class GenericWorkerServer(HomeServer):
                     # Only load the openid resource separately if federation resource
                     # is not specified since federation resource includes openid
                     # resource.
-                    resources.update(
-                        {
-                            FEDERATION_PREFIX: TransportLayerServer(
-                                self, servlet_groups=["openid"]
-                            )
-                        }
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(
+                        self, servlet_groups=["openid"]
                     )
+
 
                 if name in ["keys", "federation"]:
                     resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
@@ -371,7 +365,7 @@ class GenericWorkerServer(HomeServer):
             bind_addresses,
             port,
             SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
+                f"synapse.access.http.{site_tag}",
                 site_tag,
                 listener_config,
                 root_resource,
@@ -381,6 +375,7 @@ class GenericWorkerServer(HomeServer):
             ),
             reactor=self.get_reactor(),
         )
+
 
         logger.info("Synapse worker now listening on port %d", port)
 
@@ -469,8 +464,9 @@ def start(config_options):
     hs = GenericWorkerServer(
         config.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string=f"Synapse/{get_version_string(synapse)}",
     )
+
 
     setup_logging(hs, config, use_worker_options=True)
 

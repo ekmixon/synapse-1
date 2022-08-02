@@ -30,10 +30,11 @@ class ApiConfig(Config):
         validate_config(_MAIN_SCHEMA, config, ())
         self.room_prejoin_state = list(self._get_prejoin_state_types(config))
 
-    def generate_config_section(cls, **kwargs) -> str:
+    def generate_config_section(self, **kwargs) -> str:
         formatted_default_state_types = "\n".join(
-            "           # - %s" % (t,) for t in _DEFAULT_PREJOIN_STATE_TYPES
+            f"           # - {t}" for t in _DEFAULT_PREJOIN_STATE_TYPES
         )
+
 
         return """\
         ## API Configuration ##

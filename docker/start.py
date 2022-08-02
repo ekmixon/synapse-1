@@ -61,17 +61,17 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
 
     for name, secret in secrets.items():
         if secret not in environ:
-            filename = "/data/%s.%s.key" % (environ["SYNAPSE_SERVER_NAME"], name)
+            filename = f'/data/{environ["SYNAPSE_SERVER_NAME"]}.{name}.key'
 
             # if the file already exists, load in the existing value; otherwise,
             # generate a new secret and write it to a file
 
             if os.path.exists(filename):
-                log("Reading %s from %s" % (secret, filename))
+                log(f"Reading {secret} from {filename}")
                 with open(filename) as handle:
                     value = handle.read()
             else:
-                log("Generating a random secret for {}".format(secret))
+                log(f"Generating a random secret for {secret}")
                 value = codecs.encode(os.urandom(32), "hex").decode()
                 with open(filename, "w") as handle:
                     handle.write(value)
@@ -86,24 +86,23 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
         tlsanswerstring = str.lower(environ["SYNAPSE_NO_TLS"])
         if tlsanswerstring in ("true", "on", "1", "yes"):
             environ["SYNAPSE_NO_TLS"] = True
+        elif tlsanswerstring in ("false", "off", "0", "no"):
+            environ["SYNAPSE_NO_TLS"] = False
         else:
-            if tlsanswerstring in ("false", "off", "0", "no"):
-                environ["SYNAPSE_NO_TLS"] = False
-            else:
-                error(
-                    'Environment variable "SYNAPSE_NO_TLS" found but value "'
-                    + tlsanswerstring
-                    + '" unrecognized; exiting.'
-                )
+            error(
+                'Environment variable "SYNAPSE_NO_TLS" found but value "'
+                + tlsanswerstring
+                + '" unrecognized; exiting.'
+            )
 
     if "SYNAPSE_LOG_CONFIG" not in environ:
-        environ["SYNAPSE_LOG_CONFIG"] = config_dir + "/log.config"
+        environ["SYNAPSE_LOG_CONFIG"] = f"{config_dir}/log.config"
 
-    log("Generating synapse config file " + config_path)
+    log(f"Generating synapse config file {config_path}")
     convert("/conf/homeserver.yaml", config_path, environ)
 
     log_config_file = environ["SYNAPSE_LOG_CONFIG"]
-    log("Generating log config file " + log_config_file)
+    log(f"Generating log config file {log_config_file}")
     convert("/conf/log.config", log_config_file, environ)
 
     # Hopefully we already have a signing key, but generate one if not.
@@ -141,13 +140,16 @@ def run_generate_config(environ, ownership):
 
     server_name = environ["SYNAPSE_SERVER_NAME"]
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
-    config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
+    config_path = environ.get(
+        "SYNAPSE_CONFIG_PATH", f"{config_dir}/homeserver.yaml"
+    )
+
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
 
     # create a suitable log config from our template
-    log_config_file = "%s/%s.log.config" % (config_dir, server_name)
+    log_config_file = f"{config_dir}/{server_name}.log.config"
     if not os.path.exists(log_config_file):
-        log("Creating log config %s" % (log_config_file,))
+        log(f"Creating log config {log_config_file}")
         convert("/conf/log.config", log_config_file, environ)
 
     args = [
@@ -187,7 +189,7 @@ def main(args, environ):
     if (desired_uid == os.getuid()) and (desired_gid == os.getgid()):
         ownership = None
     else:
-        ownership = "{}:{}".format(desired_uid, desired_gid)
+        ownership = f"{desired_uid}:{desired_gid}"
 
     if ownership is None:
         log("Will not perform chmod/gosu as UserID already matches request")
@@ -200,8 +202,9 @@ def main(args, environ):
         # generate a config based on environment vars.
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
-            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
+            "SYNAPSE_CONFIG_PATH", f"{config_dir}/homeserver.yaml"
         )
+
         return generate_config_from_template(
             config_dir, config_path, environ, ownership
         )
@@ -214,19 +217,20 @@ def main(args, environ):
     if "-m" not in args:
         args = ["-m", synapse_worker] + args
 
-    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
+    jemallocpath = f"/usr/lib/{platform.machine()}-linux-gnu/libjemalloc.so.2"
 
     if os.path.isfile(jemallocpath):
         environ["LD_PRELOAD"] = jemallocpath
     else:
-        log("Could not find %s, will not use" % (jemallocpath,))
+        log(f"Could not find {jemallocpath}, will not use")
 
     # if there are no config files passed to synapse, try adding the default file
     if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
-            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
+            "SYNAPSE_CONFIG_PATH", f"{config_dir}/homeserver.yaml"
         )
+
 
         if not os.path.exists(config_path):
             if "SYNAPSE_SERVER_NAME" in environ:

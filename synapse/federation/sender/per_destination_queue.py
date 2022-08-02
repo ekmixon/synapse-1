@@ -143,7 +143,7 @@ class PerDestinationQueue:
         self._last_device_list_stream_id = 0
 
     def __str__(self) -> str:
-        return "PerDestinationQueue[%s]" % self._destination
+        return f"PerDestinationQueue[{self._destination}]"
 
     def pending_pdu_count(self) -> int:
         return len(self._pending_pdus)
@@ -265,9 +265,9 @@ class PerDestinationQueue:
             if self._catching_up:
                 # we potentially need to catch-up first
                 await self._catch_up_transmission_loop()
-                if self._catching_up:
-                    # not caught up yet
-                    return
+            if self._catching_up:
+                # not caught up yet
+                return
 
             pending_pdus = []
             while True:
@@ -489,11 +489,7 @@ class PerDestinationQueue:
                     # sending the original event. This should ensure that the
                     # server gets at least some of missed events (especially if
                     # the other sending servers are up).
-                    if new_pdus:
-                        room_catchup_pdus = new_pdus
-                    else:
-                        room_catchup_pdus = [pdu]
-
+                    room_catchup_pdus = new_pdus or [pdu]
                 logger.info(
                     "Catching up rooms to %s: %r", self._destination, pdu.room_id
                 )
@@ -569,11 +565,8 @@ class PerDestinationQueue:
             self._destination, last_device_stream_id, to_device_stream_id, limit
         )
         for content in contents:
-            message_id = content.get("message_id")
-            if not message_id:
-                continue
-
-            set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+            if message_id := content.get("message_id"):
+                set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
         edus = [
             Edu(

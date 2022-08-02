@@ -42,7 +42,7 @@ class CasConfig(Config):
                 raise ConfigError("cas_config requires a public_baseurl to be set")
 
             # TODO Update this to a _synapse URL.
-            self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
+            self.cas_service_url = f"{public_baseurl}_matrix/client/r0/login/cas/ticket"
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             required_attributes = cas_config.get("required_attributes") or {}
             self.cas_required_attributes = _parsed_required_attributes_def(

@@ -117,12 +117,11 @@ class FederationClient(FederationBase):
         self.pdu_destination_tried = {}
 
         for event_id, destination_dict in old_dict.items():
-            destination_dict = {
+            if destination_dict := {
                 dest: time
                 for dest, time in destination_dict.items()
                 if time + PDU_RETRY_TIME_MS > now
-            }
-            if destination_dict:
+            }:
                 self.pdu_destination_tried[event_id] = destination_dict
 
     @log_function
@@ -273,10 +272,7 @@ class FederationClient(FederationBase):
             The requested PDU, or None if we were unable to find it.
         """
 
-        # TODO: Rate limit the number of times we try and get the same event.
-
-        ev = self._get_pdu_cache.get(event_id)
-        if ev:
+        if ev := self._get_pdu_cache.get(event_id):
             return ev
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
@@ -583,7 +579,7 @@ class FederationClient(FederationBase):
                     "Failed to %s via %s", description, destination, exc_info=True
                 )
 
-        raise SynapseError(502, "Failed to %s via any server" % (description,))
+        raise SynapseError(502, f"Failed to {description} via any server")
 
     async def make_membership_event(
         self,
@@ -679,7 +675,7 @@ class FederationClient(FederationBase):
             return destination, ev, room_version
 
         return await self._try_destination_list(
-            "make_" + membership, destinations, send_request
+            f"make_{membership}", destinations, send_request
         )
 
     async def send_join(
@@ -752,9 +748,9 @@ class FederationClient(FederationBase):
                 # either the server that fulfilled the make_join, or the server that is
                 # handling the send_join, is lying.
                 raise InvalidResponseError(
-                    "Unexpected room version %s in create event"
-                    % (create_room_version,)
+                    f"Unexpected room version {create_room_version} in create event"
                 )
+
 
             logger.info(
                 "Processing from send_join %d events", len(state) + len(auth_chain)
@@ -807,9 +803,9 @@ class FederationClient(FederationBase):
             ]
             if auth_chain_create_events != [create_event.event_id]:
                 raise InvalidResponseError(
-                    "Unexpected create event(s) in auth chain: %s"
-                    % (auth_chain_create_events,)
+                    f"Unexpected create event(s) in auth chain: {auth_chain_create_events}"
                 )
+
 
             return SendJoinResult(
                 event=event,
@@ -818,14 +814,13 @@ class FederationClient(FederationBase):
                 origin=destination,
             )
 
-        if room_version.msc3083_join_rules:
-            # If the join is being authorised via allow rules, we need to send
-            # the /send_join back to the same server that was originally used
-            # with /make_join.
-            if "join_authorised_via_users_server" in pdu.content:
-                destinations = [
-                    get_domain_from_id(pdu.content["join_authorised_via_users_server"])
-                ]
+        if (
+            room_version.msc3083_join_rules
+            and "join_authorised_via_users_server" in pdu.content
+        ):
+            destinations = [
+                get_domain_from_id(pdu.content["join_authorised_via_users_server"])
+            ]
 
         return await self._try_destination_list("send_join", destinations, send_request)
 
@@ -915,16 +910,15 @@ class FederationClient(FederationBase):
             # fallback to the v1 endpoint if the room uses old-style event IDs.
             # Otherwise consider it a legitmate error and raise.
             err = e.to_synapse_error()
-            if self._is_unknown_endpoint(e, err):
-                if room_version.event_format != EventFormatVersions.V1:
-                    raise SynapseError(
-                        400,
-                        "User's homeserver does not support this room version",
-                        Codes.UNSUPPORTED_ROOM_VERSION,
-                    )
-            else:
+            if not self._is_unknown_endpoint(e, err):
                 raise err
 
+            if room_version.event_format != EventFormatVersions.V1:
+                raise SynapseError(
+                    400,
+                    "User's homeserver does not support this room version",
+                    Codes.UNSUPPORTED_ROOM_VERSION,
+                )
         # Didn't work, try v1 API.
         # Note the v1 API returns a tuple of `(200, content)`
 
@@ -1133,7 +1127,7 @@ class FederationClient(FederationBase):
                 destination, events, outlier=False, room_version=room_version
             )
         except HttpResponseException as e:
-            if not e.code == 400:
+            if e.code != 400:
                 raise
 
             # We are probably hitting an old server that doesn't support

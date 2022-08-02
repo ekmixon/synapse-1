@@ -22,19 +22,16 @@ import urllib2
 
 
 def make_name(pdu_id, origin):
-    return "%s@%s" % (pdu_id, origin)
+    return f"{pdu_id}@{origin}"
 
 
 def make_graph(pdus, room, filename_prefix):
     pdu_map = {}
     node_map = {}
 
-    origins = set()
     colors = {"red", "green", "blue", "yellow", "purple"}
 
-    for pdu in pdus:
-        origins.add(pdu.get("origin"))
-
+    origins = {pdu.get("origin") for pdu in pdus}
     color_map = {color: color for color in colors if color in origins}
     colors -= set(color_map.values())
 
@@ -88,7 +85,7 @@ def make_graph(pdus, room, filename_prefix):
             end_name = make_name(i, o)
 
             if end_name not in node_map:
-                print("%s not in nodes" % end_name)
+                print(f"{end_name} not in nodes")
                 continue
 
             edge = pydot.Edge(node_map[start_name], node_map[end_name])
@@ -106,17 +103,18 @@ def make_graph(pdus, room, filename_prefix):
                 )
                 graph.add_edge(state_edge)
 
-    graph.write("%s.dot" % filename_prefix, format="raw", prog="dot")
+    graph.write(f"{filename_prefix}.dot", format="raw", prog="dot")
     #    graph.write_png("%s.png" % filename_prefix, prog='dot')
-    graph.write_svg("%s.svg" % filename_prefix, prog="dot")
+    graph.write_svg(f"{filename_prefix}.svg", prog="dot")
 
 
 def get_pdus(host, room):
     transaction = json.loads(
         urllib2.urlopen(
-            "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
+            f"http://{host}/_matrix/federation/v1/context/{room}/"
         ).read()
     )
+
 
     return transaction["pdus"]
 
@@ -137,7 +135,7 @@ if __name__ == "__main__":
 
     host = args.host
     room = args.room
-    prefix = args.prefix if args.prefix else "%s_graph" % (room)
+    prefix = args.prefix or f"{room}_graph"
 
     pdus = get_pdus(host, room)
 

@@ -101,12 +101,9 @@ class FileExfiltrationWriter(ExfiltrationWriter):
     def __init__(self, user_id, directory=None):
         self.user_id = user_id
 
-        if directory:
-            self.base_directory = directory
-        else:
-            self.base_directory = tempfile.mkdtemp(
-                prefix="synapse-exfiltrate__%s__" % (user_id,)
-            )
+        self.base_directory = directory or tempfile.mkdtemp(
+            prefix=f"synapse-exfiltrate__{user_id}__"
+        )
 
         os.makedirs(self.base_directory, exist_ok=True)
         if list(os.listdir(self.base_directory)):
@@ -210,8 +207,9 @@ def start(config_options):
     ss = AdminCmdServer(
         config.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string=f"Synapse/{get_version_string(synapse)}",
     )
+
 
     setup_logging(ss, config, use_worker_options=True)
 

@@ -311,7 +311,7 @@ def serialize_event(
     time_now_ms = int(time_now_ms)
 
     # Should this strip out None's?
-    d = {k: v for k, v in e.get_dict().items()}
+    d = dict(e.get_dict().items())
 
     d["event_id"] = e.event_id
 
@@ -324,11 +324,12 @@ def serialize_event(
             e.unsigned["redacted_because"], time_now_ms, event_format=event_format
         )
 
-    if token_id is not None:
-        if token_id == getattr(e.internal_metadata, "token_id", None):
-            txn_id = getattr(e.internal_metadata, "txn_id", None)
-            if txn_id is not None:
-                d["unsigned"]["transaction_id"] = txn_id
+    if token_id is not None and token_id == getattr(
+        e.internal_metadata, "token_id", None
+    ):
+        txn_id = getattr(e.internal_metadata, "txn_id", None)
+        if txn_id is not None:
+            d["unsigned"]["transaction_id"] = txn_id
 
     # invite_room_state and knock_room_state are a list of stripped room state events
     # that are meant to provide metadata about a room to an invitee/knocker. They are
@@ -420,9 +421,7 @@ class EventClientSerializer:
                 edit_content = unfreeze(edit_content)
                 serialized_event["content"] = edit_content.get("m.new_content", {})
 
-                # Check for existing relations
-                relations = event.content.get("m.relates_to")
-                if relations:
+                if relations := event.content.get("m.relates_to"):
                     # Keep the relations, ensuring we use a dict copy of the original
                     serialized_event["content"]["m.relates_to"] = relations.copy()
                 else:

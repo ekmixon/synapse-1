@@ -45,9 +45,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
     uptime = int(now - hs.start_time)
-    if uptime < 0:
-        uptime = 0
-
+    uptime = max(uptime, 0)
     #
     # Performance statistics. Keep this early in the function to maintain reliability of `test_performance_100` test.
     #
@@ -78,9 +76,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["timestamp"] = now
     stats["uptime_seconds"] = uptime
     version = sys.version_info
-    stats["python_version"] = "{}.{}.{}".format(
-        version.major, version.minor, version.micro
-    )
+    stats["python_version"] = f"{version.major}.{version.minor}.{version.micro}"
     stats["total_users"] = await store.count_all_users()
 
     total_nonbridged_users = await store.count_nonbridged_users()
@@ -88,7 +84,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     daily_user_type_results = await store.count_daily_user_type()
     for name, count in daily_user_type_results.items():
-        stats["daily_user_type_" + name] = count
+        stats[f"daily_user_type_{name}"] = count
 
     room_count = await store.get_room_count()
     stats["total_room_count"] = room_count
@@ -107,11 +103,11 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     r30_results = await store.count_r30_users()
     for name, count in r30_results.items():
-        stats["r30_users_" + name] = count
+        stats[f"r30_users_{name}"] = count
 
     r30v2_results = await store.count_r30v2_users()
     for name, count in r30v2_results.items():
-        stats["r30v2_users_" + name] = count
+        stats[f"r30v2_users_{name}"] = count
 
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
@@ -131,7 +127,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     log_level = synapse_logger.getEffectiveLevel()
     stats["log_level"] = logging.getLevelName(log_level)
 
-    logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
+    logger.info(f"Reporting stats to {hs.config.report_stats_endpoint}: {stats}")
     try:
         await hs.get_proxied_http_client().put_json(
             hs.config.report_stats_endpoint, stats

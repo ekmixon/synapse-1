@@ -262,7 +262,7 @@ class GroupsServerWorkerHandler:
             entry = {"user_id": g_user_id}
 
             profile = await self.profile_handler.get_profile_from_cache(g_user_id)
-            entry.update(profile)
+            entry |= profile
 
             entry["is_public"] = bool(is_public)
             entry["is_privileged"] = bool(is_privileged)
@@ -311,7 +311,7 @@ class GroupsServerWorkerHandler:
             user_profile = {"user_id": user_id}
             try:
                 profile = await self.profile_handler.get_profile_from_cache(user_id)
-                user_profile.update(profile)
+                user_profile |= profile
             except Exception as e:
                 logger.warning("Error getting profile for %s: %s", user_id, e)
             user_profiles.append(user_profile)
@@ -559,9 +559,10 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 if len(value) > max_length:
                     raise SynapseError(
                         400,
-                        "Invalid %s parameter" % (keyname,),
+                        f"Invalid {keyname} parameter",
                         errcode=Codes.INVALID_PARAM,
                     )
+
                 profile[keyname] = value
 
         await self.store.update_group_profile(group_id, profile)
@@ -659,7 +660,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             local_attestation = None
         else:
             local_attestation = self.attestations.create_attestation(group_id, user_id)
-            content.update({"attestation": local_attestation})
+            content["attestation"] = local_attestation
 
             res = await self.transport_client.invite_to_group_notification(
                 get_domain_from_id(user_id), group_id, user_id, content
@@ -960,8 +961,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 def _parse_join_policy_from_contents(content: JsonDict) -> Optional[str]:
     """Given a content for a request, return the specified join policy or None"""
 
-    join_policy_dict = content.get("m.join_policy")
-    if join_policy_dict:
+    if join_policy_dict := content.get("m.join_policy"):
         return _parse_join_policy_dict(join_policy_dict)
     else:
         return None
@@ -983,8 +983,7 @@ def _parse_visibility_from_contents(content: JsonDict) -> bool:
     public or not
     """
 
-    visibility = content.get("m.visibility")
-    if visibility:
+    if visibility := content.get("m.visibility"):
         return _parse_visibility_dict(visibility)
     else:
         is_public = True

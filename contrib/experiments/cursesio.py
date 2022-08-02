@@ -71,7 +71,7 @@ class CursesStdIO:
         index = len(self.lines) - 1
         while i < (self.rows - 3) and index >= 0:
             self.stdscr.addstr(self.rows - 3 - i, 0, self.lines[index], curses.A_NORMAL)
-            i = i + 1
+            i += 1
             index = index - 1
 
         self.printLogLine(self.logLine)
@@ -99,11 +99,11 @@ class CursesStdIO:
         if c == curses.KEY_BACKSPACE:
             self.searchText = self.searchText[:-1]
 
-        elif c == curses.KEY_ENTER or c == 10:
+        elif c in [curses.KEY_ENTER, 10]:
             text = self.searchText
             self.searchText = ""
 
-            self.print_line(">> %s" % text)
+            self.print_line(f">> {text}")
 
             try:
                 if self.callback:

@@ -44,9 +44,7 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
     option expecting a list of strings.
     """
 
-    if isinstance(obj, str):
-        return [obj]
-    return obj
+    return [obj] if isinstance(obj, str) else obj
 
 
 @attr.s
@@ -138,10 +136,7 @@ class WorkerConfig(Config):
 
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)
 
-        # This option is really only here to support `--manhole` command line
-        # argument.
-        manhole = config.get("worker_manhole")
-        if manhole:
+        if manhole := config.get("worker_manhole"):
             self.worker_listeners.append(
                 ListenerConfig(
                     port=manhole,

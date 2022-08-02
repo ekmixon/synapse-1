@@ -100,7 +100,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
             try:
                 end_node = node_map[prev_id]
             except Exception:
-                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
+                end_node = pydot.Node(name=prev_id, label=f"<<b>{prev_id}</b>>")
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
@@ -112,15 +112,15 @@ def make_graph(db_name, room_id, file_prefix, limit):
         if len(event_ids) <= 1:
             continue
 
-        cluster = pydot.Cluster(str(group), label="<State Group: %s>" % (str(group),))
+        cluster = pydot.Cluster(str(group), label=f"<State Group: {str(group)}>")
 
         for event_id in event_ids:
             cluster.add_node(node_map[event_id])
 
         graph.add_subgraph(cluster)
 
-    graph.write("%s.dot" % file_prefix, format="raw", prog="dot")
-    graph.write_svg("%s.svg" % file_prefix, prog="dot")
+    graph.write(f"{file_prefix}.dot", format="raw", prog="dot")
+    graph.write_svg(f"{file_prefix}.svg", prog="dot")
 
 
 if __name__ == "__main__":

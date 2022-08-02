@@ -43,9 +43,7 @@ def pid_running(pid):
         os.kill(pid, 0)
         return True
     except OSError as err:
-        if err.errno == errno.EPERM:
-            return True
-        return False
+        return err.errno == errno.EPERM
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
@@ -83,7 +81,7 @@ def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) 
     """
 
     if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
-        print(app + " already running")
+        print(f"{app} already running")
         return True
 
     args = [sys.executable, "-m", app]
@@ -94,7 +92,7 @@ def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) 
 
     try:
         subprocess.check_call(args)
-        write("started %s(%s)" % (app, ",".join(config_files)), colour=GREEN)
+        write(f'started {app}({",".join(config_files)})', colour=GREEN)
         return True
     except subprocess.CalledProcessError as e:
         err = "%s(%s) failed to start (exit code: %d). Check the Synapse logfile" % (
@@ -124,15 +122,15 @@ def stop(pidfile: str, app: str) -> bool:
         pid = int(open(pidfile).read())
         try:
             os.kill(pid, signal.SIGTERM)
-            write("stopped %s" % (app,), colour=GREEN)
+            write(f"stopped {app}", colour=GREEN)
             return True
         except OSError as err:
             if err.errno == errno.ESRCH:
-                write("%s not running" % (app,), colour=YELLOW)
+                write(f"{app} not running", colour=YELLOW)
             elif err.errno == errno.EPERM:
-                abort("Cannot stop %s: Operation not permitted" % (app,))
+                abort(f"Cannot stop {app}: Operation not permitted")
             else:
-                abort("Cannot stop %s: Unknown error" % (app,))
+                abort(f"Cannot stop {app}: Unknown error")
             return False
     else:
         write(
@@ -210,7 +208,7 @@ def main():
         with open(config_file) as file_stream:
             yaml_config = yaml.safe_load(file_stream)
         if yaml_config is not None:
-            config.update(yaml_config)
+            config |= yaml_config
 
     pidfile = config["pid_file"]
     cache_factor = config.get("synctl_cache_factor")
@@ -221,7 +219,7 @@ def main():
 
     cache_factors = config.get("synctl_cache_factors", {})
     for cache_name, factor in cache_factors.items():
-        os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
+        os.environ[f"SYNAPSE_CACHE_FACTOR_{cache_name.upper()}"] = str(factor)
 
     worker_configfiles = []
     if options.worker:
@@ -287,39 +285,42 @@ def main():
 
     action = options.action
 
-    if action == "stop" or action == "restart":
+    if action in ["stop", "restart"]:
         has_stopped = True
         for worker in workers:
             if not stop(worker.pidfile, worker.app):
                 # A worker could not be stopped.
                 has_stopped = False
 
-        if start_stop_synapse:
-            if not stop(pidfile, MAIN_PROCESS):
-                has_stopped = False
-        if not has_stopped and action == "stop":
-            sys.exit(1)
+        if start_stop_synapse and not stop(pidfile, MAIN_PROCESS):
+            has_stopped = False
+    if not has_stopped and action == "stop":
+        sys.exit(1)
 
     # Wait for synapse to actually shutdown before starting it again
     if action == "restart":
         running_pids = []
         if start_stop_synapse and os.path.exists(pidfile):
             running_pids.append(int(open(pidfile).read()))
-        for worker in workers:
-            if os.path.exists(worker.pidfile):
-                running_pids.append(int(open(worker.pidfile).read()))
-        if len(running_pids) > 0:
+        running_pids.extend(
+            int(open(worker.pidfile).read())
+            for worker in workers
+            if os.path.exists(worker.pidfile)
+        )
+
+        if running_pids:
             write("Waiting for process to exit before restarting...")
             for running_pid in running_pids:
                 while pid_running(running_pid):
                     time.sleep(0.2)
             write("All processes exited; now restarting...")
 
-    if action == "start" or action == "restart":
+    if action in ["start", "restart"]:
         error = False
-        if start_stop_synapse:
-            if not start(pidfile, MAIN_PROCESS, (configfile,), options.daemonize):
-                error = True
+        if start_stop_synapse and not start(
+            pidfile, MAIN_PROCESS, (configfile,), options.daemonize
+        ):
+            error = True
 
         for worker in workers:
             env = os.environ.copy()
@@ -328,7 +329,7 @@ def main():
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
 
             for cache_name, factor in worker.cache_factors.items():
-                os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
+                os.environ[f"SYNAPSE_CACHE_FACTOR_{cache_name.upper()}"] = str(factor)
 
             if not start(
                 worker.pidfile,

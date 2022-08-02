@@ -428,10 +428,10 @@ class TransportLayerClient:
                 if e.code == 403:
                     raise SynapseError(
                         403,
-                        "You are not allowed to view the public rooms list of %s"
-                        % (remote_server,),
+                        f"You are not allowed to view the public rooms list of {remote_server}",
                         errcode=Codes.FORBIDDEN,
                     )
+
                 raise
         else:
             path = _create_v1_path("/publicRooms")
@@ -454,10 +454,10 @@ class TransportLayerClient:
                 if e.code == 403:
                     raise SynapseError(
                         403,
-                        "You are not allowed to view the public rooms list of %s"
-                        % (remote_server,),
+                        f"You are not allowed to view the public rooms list of {remote_server}",
                         errcode=Codes.FORBIDDEN,
                     )
+
                 raise
 
         return response
@@ -618,8 +618,8 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             data={
-                "limit": int(limit),
-                "min_depth": int(min_depth),
+                "limit": limit,
+                "min_depth": min_depth,
                 "earliest_events": earliest_events,
                 "latest_events": latest_events,
             },
@@ -1273,15 +1273,17 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
 
         self._coro_state = ijson.items_coro(
             _event_list_parser(room_version, self._response.state),
-            prefix + "state.item",
+            f"{prefix}state.item",
         )
+
         self._coro_auth = ijson.items_coro(
             _event_list_parser(room_version, self._response.auth_events),
-            prefix + "auth_chain.item",
+            f"{prefix}auth_chain.item",
         )
+
         self._coro_event = ijson.kvitems_coro(
             _event_parser(self._response.event_dict),
-            prefix + "org.matrix.msc3083.v2.event",
+            f"{prefix}org.matrix.msc3083.v2.event",
         )
 
     def write(self, data: bytes) -> int:

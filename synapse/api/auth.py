@@ -122,7 +122,7 @@ class Auth:
                 if not forgot:
                     return member
 
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        raise AuthError(403, f"User {user_id} not in room {room_id}")
 
     async def get_user_by_req(
         self,
@@ -185,18 +185,20 @@ class Auth:
             shadow_banned = user_info.shadow_banned
 
             # Deny the request if the user account has expired.
-            if not allow_expired:
-                if await self._account_validity_handler.is_user_expired(
+            if (
+                not allow_expired
+                and await self._account_validity_handler.is_user_expired(
                     user_info.user_id
-                ):
-                    # Raise the error if either an account validity module has determined
-                    # the account has expired, or the legacy account validity
-                    # implementation is enabled and determined the account has expired
-                    raise AuthError(
-                        403,
-                        "User account has expired",
-                        errcode=Codes.EXPIRED_ACCOUNT,
-                    )
+                )
+            ):
+                # Raise the error if either an account validity module has determined
+                # the account has expired, or the legacy account validity
+                # implementation is enabled and determined the account has expired
+                raise AuthError(
+                    403,
+                    "User account has expired",
+                    errcode=Codes.EXPIRED_ACCOUNT,
+                )
 
             device_id = user_info.device_id
 
@@ -262,16 +264,16 @@ class Auth:
         # It's ok if the app service is trying to use the sender from their registration
         if app_service.sender == user_id:
             pass
-        # Check to make sure the app service is allowed to control the user
         elif not app_service.is_interested_in_user(user_id):
             raise AuthError(
                 403,
-                "Application service cannot masquerade as this user (%s)." % user_id,
+                f"Application service cannot masquerade as this user ({user_id}).",
             )
-        # Check to make sure the user is already registered on the homeserver
+
         elif not (await self.store.get_user_by_id(user_id)):
             raise AuthError(
-                403, "Application service has not registered this user (%s)" % user_id
+                403,
+                f"Application service has not registered this user ({user_id})",
             )
 
     async def _get_appservice_user_id(
@@ -365,7 +367,7 @@ class Auth:
                 # guest tokens.
                 stored_user = await self.store.get_user_by_id(user_id)
                 if not stored_user:
-                    raise InvalidClientTokenError("Unknown user_id %s" % user_id)
+                    raise InvalidClientTokenError(f"Unknown user_id {user_id}")
                 if not stored_user["is_guest"]:
                     raise InvalidClientTokenError(
                         "Guest access token used for regular user"
@@ -405,8 +407,7 @@ class Auth:
             (user_id, is_guest)
         """
         if rights == "access":
-            cached = self.token_cache.get(token, None)
-            if cached:
+            if cached := self.token_cache.get(token, None):
                 return cached
 
         try:
@@ -421,11 +422,7 @@ class Auth:
         try:
             user_id = get_value_from_macaroon(macaroon, "user_id")
 
-            guest = False
-            for caveat in macaroon.caveats:
-                if caveat.caveat_id == "guest = true":
-                    guest = True
-
+            guest = any(caveat.caveat_id == "guest = true" for caveat in macaroon.caveats)
             self.validate_macaroon(macaroon, rights, user_id=user_id)
         except (
             pymacaroons.exceptions.MacaroonException,
@@ -458,8 +455,8 @@ class Auth:
         # least one of the predicates specified by satisfy_exact or
         # specify_general.
         v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = " + type_string)
-        v.satisfy_exact("user_id = %s" % user_id)
+        v.satisfy_exact(f"type = {type_string}")
+        v.satisfy_exact(f"user_id = {user_id}")
         v.satisfy_exact("guest = true")
         satisfy_expiry(v, self.clock.time_msec)
 
@@ -567,12 +564,10 @@ class Auth:
                 return parts[1].decode("ascii")
             else:
                 raise MissingClientTokenError("Invalid Authorization header.")
-        else:
-            # Try to get the access_token from the query params.
-            if not query_params:
-                raise MissingClientTokenError()
-
+        elif query_params:
             return query_params[0].decode("ascii")
+        else:
+            raise MissingClientTokenError()
 
     async def check_user_in_room_or_world_readable(
         self, room_id: str, user_id: str, allow_departed_users: bool = False
@@ -614,8 +609,7 @@ class Auth:
                 return Membership.JOIN, None
             raise AuthError(
                 403,
-                "User %s not in room %s, and room previews are disabled"
-                % (user_id, room_id),
+                f"User {user_id} not in room {room_id}, and room previews are disabled",
             )
 
     async def check_auth_blocking(self, *args, **kwargs) -> None:

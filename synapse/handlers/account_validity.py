@@ -62,24 +62,21 @@ class AccountValidityHandler:
                 hs.config.account_validity.account_validity_period
             )
 
-        if (
-            self._account_validity_enabled
-            and self._account_validity_renew_by_email_enabled
-        ):
-            # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = (
-                hs.config.account_validity.account_validity_template_html
-            )
-            self._template_text = (
-                hs.config.account_validity.account_validity_template_text
-            )
-            self._renew_email_subject = (
-                hs.config.account_validity.account_validity_renew_email_subject
-            )
+            if self._account_validity_renew_by_email_enabled:
+                # Don't do email-specific configuration if renewal by email is disabled.
+                self._template_html = (
+                    hs.config.account_validity.account_validity_template_html
+                )
+                self._template_text = (
+                    hs.config.account_validity.account_validity_template_text
+                )
+                self._renew_email_subject = (
+                    hs.config.account_validity.account_validity_renew_email_subject
+                )
 
-            # Check the renewal emails to send and send them every 30min.
-            if hs.config.run_background_tasks:
-                self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
+                # Check the renewal emails to send and send them every 30min.
+                if hs.config.run_background_tasks:
+                    self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
         self._on_user_registration_callbacks: List[ON_USER_REGISTRATION_CALLBACK] = []
@@ -214,7 +211,7 @@ class AccountValidityHandler:
 
         # If this user isn't set to be expired, raise an error.
         if expiration_ts is None:
-            raise SynapseError(400, "User has no expiration time: %s" % (user_id,))
+            raise SynapseError(400, f"User has no expiration time: {user_id}")
 
         await self._send_renewal_email(user_id, expiration_ts)
 
@@ -248,10 +245,8 @@ class AccountValidityHandler:
             user_display_name = user_id
 
         renewal_token = await self._get_renewal_token(user_id)
-        url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
-            self.hs.config.public_baseurl,
-            renewal_token,
-        )
+        url = f"{self.hs.config.public_baseurl}_matrix/client/unstable/account_validity/renew?token={renewal_token}"
+
 
         template_vars = {
             "display_name": user_display_name,
@@ -286,12 +281,11 @@ class AccountValidityHandler:
         """
         threepids = await self.store.user_get_threepids(user_id)
 
-        addresses = []
-        for threepid in threepids:
-            if threepid["medium"] == "email":
-                addresses.append(threepid["address"])
-
-        return addresses
+        return [
+            threepid["address"]
+            for threepid in threepids
+            if threepid["medium"] == "email"
+        ]
 
     async def _get_renewal_token(self, user_id: str) -> str:
         """Generates a 32-byte long random string that will be inserted into the

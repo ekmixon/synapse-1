@@ -174,27 +174,18 @@ class CacheConfig(Config):
         if not isinstance(individual_factors, dict):
             raise ConfigError("caches.per_cache_factors must be a dictionary")
 
-        # Canonicalise the cache names *before* updating with the environment
-        # variables.
         individual_factors = {
             _canonicalise_cache_name(key): val
             for key, val in individual_factors.items()
+        } | {
+            _canonicalise_cache_name(key[len(_CACHE_PREFIX) + 1 :]): float(val)
+            for key, val in self._environ.items()
+            if key.startswith(f"{_CACHE_PREFIX}_")
         }
-
-        # Override factors from environment if necessary
-        individual_factors.update(
-            {
-                _canonicalise_cache_name(key[len(_CACHE_PREFIX) + 1 :]): float(val)
-                for key, val in self._environ.items()
-                if key.startswith(_CACHE_PREFIX + "_")
-            }
-        )
 
         for cache, factor in individual_factors.items():
             if not isinstance(factor, (int, float)):
-                raise ConfigError(
-                    "caches.per_cache_factors.%s must be a number" % (cache,)
-                )
+                raise ConfigError(f"caches.per_cache_factors.{cache} must be a number")
             self.cache_factors[cache] = factor
 
         self.track_memory_usage = cache_config.get("track_memory_usage", False)
@@ -206,8 +197,7 @@ class CacheConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
-        expiry_time = cache_config.get("expiry_time")
-        if expiry_time:
+        if expiry_time := cache_config.get("expiry_time"):
             self.expiry_time_msec = self.parse_duration(expiry_time)
         else:
             self.expiry_time_msec = None

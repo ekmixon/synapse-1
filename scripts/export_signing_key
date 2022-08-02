@@ -29,12 +29,7 @@ def exit(status: int = 0, message: Optional[str] = None):
 
 def format_plain(public_key: nacl.signing.VerifyKey):
     print(
-        "%s:%s %s"
-        % (
-            public_key.alg,
-            public_key.version,
-            encode_verify_key_base64(public_key),
-        )
+        f"{public_key.alg}:{public_key.version} {encode_verify_key_base64(public_key)}"
     )
 
 
@@ -92,9 +87,9 @@ if __name__ == "__main__":
         except Exception as e:
             exit(
                 status=1,
-                message="Error reading key from file %s: %s %s"
-                % (file.name, type(e), e),
+                message=f"Error reading key from file {file.name}: {type(e)} {e}",
             )
+
             res = []
         for key in res:
             formatter(get_verify_key(key))

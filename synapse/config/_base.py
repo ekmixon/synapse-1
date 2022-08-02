@@ -125,7 +125,7 @@ class Config:
         This is so that existing configs that rely on `self.value`, where value
         is actually from a different config section, continue to work.
         """
-        if item in ["generate_config_section", "read_config"]:
+        if item in {"generate_config_section", "read_config"}:
             raise AttributeError(item)
 
         if self.root is None:
@@ -187,7 +187,7 @@ class Config:
     @classmethod
     def check_file(cls, file_path, config_name):
         if file_path is None:
-            raise ConfigError("Missing config for %s." % (config_name,))
+            raise ConfigError(f"Missing config for {config_name}.")
         try:
             os.stat(file_path)
         except OSError as e:
@@ -206,7 +206,7 @@ class Config:
             if e.errno != errno.EEXIST:
                 raise
         if not os.path.isdir(dir_path):
-            raise ConfigError("%s is not a directory" % (dir_path,))
+            raise ConfigError(f"{dir_path} is not a directory")
         return dir_path
 
     @classmethod
@@ -268,9 +268,9 @@ class Config:
             # Check that the given template directory exists
             if not self.path_exists(custom_template_directory):
                 raise ConfigError(
-                    "Configured template directory does not exist: %s"
-                    % (custom_template_directory,)
+                    f"Configured template directory does not exist: {custom_template_directory}"
                 )
+
 
             # Search the custom template directory as well
             search_directories.insert(0, custom_template_directory)
@@ -353,7 +353,7 @@ class RootConfig:
             if item in dir(val):
                 return getattr(val, item)
 
-        raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
+        raise AttributeError(item, f"not found in {list(self._configs.keys())}")
 
     def invoke_all(self, func_name: str, *args, **kwargs) -> MutableMapping[str, Any]:
         """
@@ -548,10 +548,10 @@ class RootConfig:
         if not config_files:
             parser.error("Must supply a config file.")
 
-        if config_args.keys_directory:
-            config_dir_path = config_args.keys_directory
-        else:
-            config_dir_path = os.path.dirname(config_files[-1])
+        config_dir_path = config_args.keys_directory or os.path.dirname(
+            config_files[-1]
+        )
+
         config_dir_path = os.path.abspath(config_dir_path)
         data_dir_path = os.getcwd()
 
@@ -642,10 +642,10 @@ class RootConfig:
                 ' -c CONFIG-FILE"'
             )
 
-        if config_args.config_directory:
-            config_dir_path = config_args.config_directory
-        else:
-            config_dir_path = os.path.dirname(config_files[-1])
+        config_dir_path = config_args.config_directory or os.path.dirname(
+            config_files[-1]
+        )
+
         config_dir_path = os.path.abspath(config_dir_path)
         data_dir_path = os.getcwd()
 
@@ -662,12 +662,9 @@ class RootConfig:
 
             (config_path,) = config_files
             if not path_exists(config_path):
-                print("Generating config file %s" % (config_path,))
+                print(f"Generating config file {config_path}")
 
-                if config_args.data_directory:
-                    data_dir_path = config_args.data_directory
-                else:
-                    data_dir_path = os.getcwd()
+                data_dir_path = config_args.data_directory or os.getcwd()
                 data_dir_path = os.path.abspath(data_dir_path)
 
                 server_name = config_args.server_name
@@ -767,7 +764,7 @@ def read_config_files(config_files):
             print(err % (config_file,))
             continue
 
-        specified_config.update(yaml_config)
+        specified_config |= yaml_config
 
     if "server_name" not in specified_config:
         raise ConfigError(MISSING_SERVER_NAME)
@@ -839,10 +836,7 @@ class ShardedWorkerHandlingConfig:
         """Whether this instance is responsible for handling the given key."""
         # If no instances are defined we assume some other worker is handling
         # this.
-        if not self.instances:
-            return False
-
-        return self._get_instance(key) == instance_name
+        return self._get_instance(key) == instance_name if self.instances else False
 
     def _get_instance(self, key: str) -> str:
         """Get the instance responsible for handling the given key.

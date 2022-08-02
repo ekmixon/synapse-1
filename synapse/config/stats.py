@@ -38,8 +38,7 @@ class StatsConfig(Config):
 
     def read_config(self, config, **kwargs):
         self.stats_enabled = True
-        stats_config = config.get("stats", None)
-        if stats_config:
+        if stats_config := config.get("stats", None):
             self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
         if not self.stats_enabled:
             logger.warning(ROOM_STATS_DISABLED_WARN)

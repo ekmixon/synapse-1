@@ -27,10 +27,10 @@ class FederationConfig(Config):
 
         if federation_domain_whitelist is not None:
             # turn the whitelist into a hash for speed of lookup
-            self.federation_domain_whitelist = {}
+            self.federation_domain_whitelist = {
+                domain: True for domain in federation_domain_whitelist
+            }
 
-            for domain in federation_domain_whitelist:
-                self.federation_domain_whitelist[domain] = True
 
         federation_metrics_domains = config.get("federation_metrics_domains") or []
         validate_config(

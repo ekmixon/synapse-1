@@ -743,7 +743,7 @@ class FederationServer(FederationBase):
             raise SynapseError(400, "Not an m.room.member event", Codes.BAD_JSON)
 
         if event.content.get("membership") != membership_type:
-            raise SynapseError(400, "Not a %s event" % membership_type, Codes.BAD_JSON)
+            raise SynapseError(400, f"Not a {membership_type} event", Codes.BAD_JSON)
 
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, event.room_id)
@@ -811,8 +811,10 @@ class FederationServer(FederationBase):
     ) -> Dict[str, Any]:
         query = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
-            for device_id, algorithm in device_keys.items():
-                query.append((user_id, device_id, algorithm))
+            query.extend(
+                (user_id, device_id, algorithm)
+                for device_id, algorithm in device_keys.items()
+            )
 
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self.store.claim_e2e_one_time_keys(query)
@@ -828,14 +830,13 @@ class FederationServer(FederationBase):
         logger.info(
             "Claimed one-time-keys: %s",
             ",".join(
-                (
-                    "%s for %s:%s" % (key_id, user_id, device_id)
-                    for user_id, user_keys in json_result.items()
-                    for device_id, device_keys in user_keys.items()
-                    for key_id, _ in device_keys.items()
-                )
+                f"{key_id} for {user_id}:{device_id}"
+                for user_id, user_keys in json_result.items()
+                for device_id, device_keys in user_keys.items()
+                for key_id, _ in device_keys.items()
             ),
         )
+
 
         return {"one_time_keys": json_result}
 
@@ -1031,7 +1032,7 @@ class FederationServer(FederationBase):
                 return
 
     def __str__(self) -> str:
-        return "<ReplicationLayer(%s)>" % self.server_name
+        return f"<ReplicationLayer({self.server_name})>"
 
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict
@@ -1108,14 +1109,7 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     if not isinstance(allow, (list, tuple)):
         logger.warning("Ignoring non-list allow ACL %s", allow)
         allow = []
-    for e in allow:
-        if _acl_entry_matches(server_name, e):
-            # logger.info("%s matched allow rule %s", server_name, e)
-            return True
-
-    # everything else should be rejected.
-    # logger.info("%s fell through", server_name)
-    return False
+    return any(_acl_entry_matches(server_name, e) for e in allow)
 
 
 def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
@@ -1166,7 +1160,7 @@ class FederationHandlerRegistry:
                 the EDU contents.
         """
         if edu_type in self.edu_handlers:
-            raise KeyError("Already have an EDU handler for %s" % (edu_type,))
+            raise KeyError(f"Already have an EDU handler for {edu_type}")
 
         logger.info("Registering federation EDU handler for %r", edu_type)
 
@@ -1186,7 +1180,7 @@ class FederationHandlerRegistry:
                 on and the result used as the response to the query request.
         """
         if query_type in self.query_handlers:
-            raise KeyError("Already have a Query handler for %s" % (query_type,))
+            raise KeyError(f"Already have a Query handler for {query_type}")
 
         logger.info("Registering federation query handler for %r", query_type)
 
@@ -1206,9 +1200,7 @@ class FederationHandlerRegistry:
         if not self.config.use_presence and edu_type == EduTypes.Presence:
             return
 
-        # Check if we have a handler on this instance
-        handler = self.edu_handlers.get(edu_type)
-        if handler:
+        if handler := self.edu_handlers.get(edu_type):
             with start_active_span_from_edu(content, "handle_edu"):
                 try:
                     await handler(origin, content)
@@ -1241,8 +1233,7 @@ class FederationHandlerRegistry:
         logger.warning("No handler registered for EDU type %s", edu_type)
 
     async def on_query(self, query_type: str, args: dict) -> JsonDict:
-        handler = self.query_handlers.get(query_type)
-        if handler:
+        if handler := self.query_handlers.get(query_type):
             return await handler(args)
 
         # Check if we can route it somewhere else that isn't us

@@ -202,19 +202,18 @@ class ApplicationServicesHandler:
         if stream_key not in ("typing_key", "receipt_key", "presence_key"):
             return
 
-        services = [
+        if services := [
             service
             for service in self.store.get_app_services()
             if service.supports_ephemeral
-        ]
-        if not services:
+        ]:
+            # We only start a new background process if necessary rather than
+            # optimistically (to cut down on overhead).
+            self._notify_interested_services_ephemeral(
+                services, stream_key, new_token, users or []
+            )
+        else:
             return
-
-        # We only start a new background process if necessary rather than
-        # optimistically (to cut down on overhead).
-        self._notify_interested_services_ephemeral(
-            services, stream_key, new_token, users or []
-        )
 
     @wrap_as_background_process("notify_interested_services_ephemeral")
     async def _notify_interested_services_ephemeral(
@@ -224,7 +223,7 @@ class ApplicationServicesHandler:
         new_token: Optional[int],
         users: Collection[Union[str, UserID]],
     ):
-        logger.debug("Checking interested services for %s" % (stream_key))
+        logger.debug(f"Checking interested services for {stream_key}")
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
                 # Only handle typing if we have the latest token
@@ -406,7 +405,7 @@ class ApplicationServicesHandler:
 
             return combined
 
-        return {p: _merge_instances(protocols[p]) for p in protocols.keys()}
+        return {p: _merge_instances(protocols[p]) for p in protocols}
 
     async def _get_services_for_event(
         self, event: EventBase
@@ -451,10 +450,8 @@ class ApplicationServicesHandler:
         # user not found; could be the AS though, so check.
         services = self.store.get_app_services()
         service_list = [s for s in services if s.sender == user_id]
-        return len(service_list) == 0
+        return not service_list
 
     async def _check_user_exists(self, user_id: str) -> bool:
         unknown_user = await self._is_unknown_user(user_id)
-        if unknown_user:
-            return await self.query_user_exists(user_id)
-        return True
+        return await self.query_user_exists(user_id) if unknown_user else True

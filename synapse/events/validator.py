@@ -50,7 +50,7 @@ class EventValidator:
 
         for k in required:
             if not hasattr(event, k):
-                raise SynapseError(400, "Event does not have key %s" % (k,))
+                raise SynapseError(400, f"Event does not have key {k}")
 
         # Check that the following keys have string values
         event_strings = ["origin"]
@@ -65,27 +65,27 @@ class EventValidator:
             # checked, since we trust the portions of the event we created.
             validate_canonicaljson(event.content)
 
-        if event.type == EventTypes.Aliases:
-            if "aliases" in event.content:
-                for alias in event.content["aliases"]:
-                    if len(alias) > MAX_ALIAS_LENGTH:
-                        raise SynapseError(
-                            400,
-                            (
-                                "Can't create aliases longer than"
-                                " %d characters" % (MAX_ALIAS_LENGTH,)
-                            ),
-                            Codes.INVALID_PARAM,
-                        )
+        if event.type == EventTypes.Aliases and "aliases" in event.content:
+            for alias in event.content["aliases"]:
+                if len(alias) > MAX_ALIAS_LENGTH:
+                    raise SynapseError(
+                        400,
+                        (
+                            "Can't create aliases longer than"
+                            " %d characters" % (MAX_ALIAS_LENGTH,)
+                        ),
+                        Codes.INVALID_PARAM,
+                    )
 
         if event.type == EventTypes.Retention:
             self._validate_retention(event)
 
-        if event.type == EventTypes.ServerACL:
-            if not server_matches_acl_event(config.server_name, event):
-                raise SynapseError(
-                    400, "Can't create an ACL event that denies the local server"
-                )
+        if event.type == EventTypes.ServerACL and not server_matches_acl_event(
+            config.server_name, event
+        ):
+            raise SynapseError(
+                400, "Can't create an ACL event that denies the local server"
+            )
 
     def _validate_retention(self, event: EventBase):
         """Checks that an event that defines the retention policy for a room respects the
@@ -100,21 +100,19 @@ class EventValidator:
         min_lifetime = event.content.get("min_lifetime")
         max_lifetime = event.content.get("max_lifetime")
 
-        if min_lifetime is not None:
-            if not isinstance(min_lifetime, int):
-                raise SynapseError(
-                    code=400,
-                    msg="'min_lifetime' must be an integer",
-                    errcode=Codes.BAD_JSON,
-                )
+        if min_lifetime is not None and not isinstance(min_lifetime, int):
+            raise SynapseError(
+                code=400,
+                msg="'min_lifetime' must be an integer",
+                errcode=Codes.BAD_JSON,
+            )
 
-        if max_lifetime is not None:
-            if not isinstance(max_lifetime, int):
-                raise SynapseError(
-                    code=400,
-                    msg="'max_lifetime' must be an integer",
-                    errcode=Codes.BAD_JSON,
-                )
+        if max_lifetime is not None and not isinstance(max_lifetime, int):
+            raise SynapseError(
+                code=400,
+                msg="'max_lifetime' must be an integer",
+                errcode=Codes.BAD_JSON,
+            )
 
         if (
             min_lifetime is not None

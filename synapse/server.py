@@ -178,7 +178,7 @@ def cache_in_self(builder: T) -> T:
 
         # Prevent cyclic dependencies from deadlocking
         if building[0]:
-            raise ValueError("Cyclic dependency while building %s" % (depname,))
+            raise ValueError(f"Cyclic dependency while building {depname}")
 
         building[0] = True
         try:
@@ -332,7 +332,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         therefore instantiated, to run those side effects.
         """
         for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
-            getattr(self, "get_" + i + "_handler")()
+            getattr(self, f"get_{i}_handler")()
 
     def get_reactor(self) -> ISynapseReactor:
         """

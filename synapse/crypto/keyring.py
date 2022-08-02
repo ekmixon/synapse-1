@@ -305,15 +305,10 @@ class Keyring:
                 )
                 raise SynapseError(
                     401,
-                    "Invalid signature for server %s with key %s:%s: %s"
-                    % (
-                        verify_request.server_name,
-                        verify_key.alg,
-                        verify_key.version,
-                        str(e),
-                    ),
+                    f"Invalid signature for server {verify_request.server_name} with key {verify_key.alg}:{verify_key.version}: {str(e)}",
                     Codes.UNAUTHORIZED,
                 )
+
 
         if not verified:
             raise SynapseError(
@@ -393,10 +388,7 @@ class Keyring:
                 if not key:
                     continue
 
-                # If we already have a result for the given key ID we keep the
-                # one with the highest `valid_until_ts`.
-                existing_key = found_keys.get(key_id)
-                if existing_key:
+                if existing_key := found_keys.get(key_id):
                     if key.valid_until_ts <= existing_key.valid_until_ts:
                         continue
 
@@ -529,9 +521,9 @@ class BaseV2KeyFetcher(KeyFetcher):
 
         if not verified:
             raise KeyLookupError(
-                "Key response for %s is not signed by the origin server"
-                % (server_name,)
+                f"Key response for {server_name} is not signed by the origin server"
             )
+
 
         for key_id, key_data in response_json["old_verify_keys"].items():
             if is_signing_algorithm_supported(key_id):
@@ -656,7 +648,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             # these both have str() representations which we can't really improve upon
             raise KeyLookupError(str(e))
         except HttpResponseException as e:
-            raise KeyLookupError("Remote server returned an error: %s" % (e,))
+            raise KeyLookupError(f"Remote server returned an error: {e}")
 
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         added_keys: List[Tuple[str, str, FetchKeyResult]] = []
@@ -669,9 +661,9 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             server_name = response.get("server_name")
             if not isinstance(server_name, str):
                 raise KeyLookupError(
-                    "Malformed response from key notary server %s: invalid server_name"
-                    % (perspective_name,)
+                    f"Malformed response from key notary server {perspective_name}: invalid server_name"
                 )
+
 
             try:
                 self._validate_perspectives_response(key_server, response)
@@ -839,7 +831,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 # upon
                 raise KeyLookupError(str(e))
             except HttpResponseException as e:
-                raise KeyLookupError("Remote server returned an error: %s" % (e,))
+                raise KeyLookupError(f"Remote server returned an error: {e}")
 
             assert isinstance(response, dict)
             if response["server_name"] != server_name:
@@ -858,6 +850,6 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 time_now_ms,
                 ((server_name, key_id, key) for key_id, key in response_keys.items()),
             )
-            keys.update(response_keys)
+            keys |= response_keys
 
         return keys

@@ -191,11 +191,8 @@ class Store(
         return self.db_pool.runInteraction("execute_sql", r)
 
     def insert_many_txn(self, txn, table, headers, rows):
-        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
-            table,
-            ", ".join(k for k in headers),
-            ", ".join("%s" for _ in headers),
-        )
+        sql = f'INSERT INTO {table} ({", ".join(headers)}) VALUES ({", ".join(("%s" for _ in headers))})'
+
 
         try:
             txn.executemany(sql, rows)
@@ -214,7 +211,7 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server_name
-        self.version_string = "Synapse/" + get_version_string(synapse)
+        self.version_string = f"Synapse/{get_version_string(synapse)}"
 
     def get_clock(self):
         return self.clock
@@ -276,7 +273,7 @@ class Porter(object):
                 txn.execute(
                     "DELETE FROM port_from_sqlite3 WHERE table_name = %s", (table,)
                 )
-                txn.execute("TRUNCATE %s CASCADE" % (table,))
+                txn.execute(f"TRUNCATE {table} CASCADE")
 
             await self.postgres_store.execute(delete_all)
 
@@ -359,12 +356,14 @@ class Porter(object):
             return
 
         forward_select = (
-            "SELECT rowid, * FROM %s WHERE rowid >= ? ORDER BY rowid LIMIT ?" % (table,)
+            f"SELECT rowid, * FROM {table} WHERE rowid >= ? ORDER BY rowid LIMIT ?"
         )
 
+
         backward_select = (
-            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid LIMIT ?" % (table,)
+            f"SELECT rowid, * FROM {table} WHERE rowid <= ? ORDER BY rowid LIMIT ?"
         )
+
 
         do_forward = [True]
         do_backward = [True]
@@ -519,7 +518,7 @@ class Porter(object):
         Returns:
             The built Store object.
         """
-        self.progress.set_state("Preparing %s" % db_config.config["name"])
+        self.progress.set_state(f'Preparing {db_config.config["name"]}')
 
         engine = create_engine(db_config.config)
 
@@ -799,10 +798,7 @@ class Porter(object):
             )
 
             rows = txn.fetchall()
-            if rows:
-                return rows[0][0]
-            else:
-                return 1
+            return rows[0][0] if rows else 1
 
         next_chunk = await self.sqlite_store.execute(get_start_id)
         next_chunk = max(max_inserted_rowid + 1, next_chunk)
@@ -831,19 +827,19 @@ class Porter(object):
 
     async def _get_remaining_count_to_port(self, table, forward_chunk, backward_chunk):
         frows = await self.sqlite_store.execute_sql(
-            "SELECT count(*) FROM %s WHERE rowid >= ?" % (table,), forward_chunk
+            f"SELECT count(*) FROM {table} WHERE rowid >= ?", forward_chunk
         )
 
+
         brows = await self.sqlite_store.execute_sql(
-            "SELECT count(*) FROM %s WHERE rowid <= ?" % (table,), backward_chunk
+            f"SELECT count(*) FROM {table} WHERE rowid <= ?", backward_chunk
         )
+
 
         return frows[0][0] + brows[0][0]
 
     async def _get_already_ported_count(self, table):
-        rows = await self.postgres_store.execute_sql(
-            "SELECT count(*) FROM %s" % (table,)
-        )
+        rows = await self.postgres_store.execute_sql(f"SELECT count(*) FROM {table}")
 
         return rows[0][0]
 
@@ -943,12 +939,10 @@ class Porter(object):
         next_id = max(current_stream_ids) + 1
 
         def r(txn):
-            sql = "ALTER SEQUENCE %s RESTART WITH" % (sequence_name,)
-            txn.execute(sql + " %s", (next_id,))
+            sql = f"ALTER SEQUENCE {sequence_name} RESTART WITH"
+            txn.execute(f"{sql} %s", (next_id,))
 
-        await self.postgres_store.db_pool.runInteraction(
-            "_setup_%s" % (sequence_name,), r
-        )
+        await self.postgres_store.db_pool.runInteraction(f"_setup_{sequence_name}", r)
 
     async def _setup_auth_chain_sequence(self) -> None:
         curr_chain_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
@@ -1050,7 +1044,7 @@ class CursesProgress(Progress):
         duration_str = "%02dm %02ds" % (minutes, seconds)
 
         if self.finished:
-            status = "Time spent: %s (Done!)" % (duration_str,)
+            status = f"Time spent: {duration_str} (Done!)"
         else:
 
             if self.total_processed > 0:
@@ -1060,14 +1054,11 @@ class CursesProgress(Progress):
                 est_remaining_str = "%02dm %02ds remaining" % divmod(est_remaining, 60)
             else:
                 est_remaining_str = "Unknown"
-            status = "Time spent: %s (est. remaining: %s)" % (
-                duration_str,
-                est_remaining_str,
-            )
+            status = f"Time spent: {duration_str} (est. remaining: {est_remaining_str})"
 
         self.stdscr.addstr(0, 0, status, curses.A_BOLD)
 
-        max_len = max([len(t) for t in self.tables.keys()])
+        max_len = max(len(t) for t in self.tables.keys())
 
         left_margin = 5
         middle_space = 1
@@ -1089,10 +1080,8 @@ class CursesProgress(Progress):
 
             size = 20
 
-            progress = "[%s%s]" % (
-                "#" * int(perc * size / 100),
-                " " * (size - int(perc * size / 100)),
-            )
+            progress = f'[{"#" * int(perc * size / 100)}{" " * (size - int(perc * size / 100))}]'
+
 
             self.stdscr.addstr(
                 i + 2,
@@ -1113,7 +1102,7 @@ class CursesProgress(Progress):
 
     def set_state(self, state):
         self.stdscr.clear()
-        self.stdscr.addstr(0, 0, state + "...", curses.A_BOLD)
+        self.stdscr.addstr(0, 0, f"{state}...", curses.A_BOLD)
         self.stdscr.refresh()
 
 
@@ -1130,7 +1119,7 @@ class TerminalProgress(Progress):
         )
 
     def set_state(self, state):
-        print(state + "...")
+        print(f"{state}...")
 
 
 ##############################################
@@ -1208,11 +1197,7 @@ if __name__ == "__main__":
     config.parse_config_dict(hs_config, "", "")
 
     def start(stdscr=None):
-        if stdscr:
-            progress = CursesProgress(stdscr)
-        else:
-            progress = TerminalProgress()
-
+        progress = CursesProgress(stdscr) if stdscr else TerminalProgress()
         porter = Porter(
             sqlite_config=sqlite_config,
             progress=progress,

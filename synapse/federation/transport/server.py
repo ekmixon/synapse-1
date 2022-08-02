@@ -214,10 +214,7 @@ def _parse_auth_header(header_bytes):
         param_dict = dict(kv.split("=") for kv in params)
 
         def strip_quotes(value):
-            if value.startswith('"'):
-                return value[1:-1]
-            else:
-                return value
+            return value[1:-1] if value.startswith('"') else value
 
         origin = strip_quotes(param_dict["origin"])
 
@@ -378,10 +375,10 @@ class BaseFederationServlet:
         return new_func
 
     def register(self, server):
-        pattern = re.compile("^" + self.PREFIX + self.PATH + "$")
+        pattern = re.compile(f"^{self.PREFIX}{self.PATH}$")
 
         for method in ("GET", "PUT", "POST"):
-            code = getattr(self, "on_%s" % (method), None)
+            code = getattr(self, f"on_{method}", None)
             if code is None:
                 continue
 
@@ -532,10 +529,13 @@ class FederationBackfillServlet(BaseFederationServerServlet):
         versions = [x.decode("ascii") for x in query[b"v"]]
         limit = parse_integer_from_args(query, "limit", None)
 
-        if not limit:
-            return 400, {"error": "Did not include limit param"}
-
-        return await self.handler.on_backfill_request(origin, room_id, versions, limit)
+        return (
+            await self.handler.on_backfill_request(
+                origin, room_id, versions, limit
+            )
+            if limit
+            else (400, {"error": "Did not include limit param"})
+        )
 
 
 class FederationQueryServlet(BaseFederationServerServlet):
@@ -1515,7 +1515,7 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if category_id == "":
+        if not category_id:
             raise SynapseError(
                 400, "category_id cannot be empty string", Codes.INVALID_PARAM
             )
@@ -1523,10 +1523,10 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
         if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
             raise SynapseError(
                 400,
-                "category_id may not be longer than %s characters"
-                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                f"category_id may not be longer than {MAX_GROUP_CATEGORYID_LENGTH} characters",
                 Codes.INVALID_PARAM,
             )
+
 
         resp = await self.handler.update_group_summary_room(
             group_id,
@@ -1553,7 +1553,7 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if category_id == "":
+        if not category_id:
             raise SynapseError(400, "category_id cannot be empty string")
 
         resp = await self.handler.delete_group_summary_room(
@@ -1625,16 +1625,16 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if category_id == "":
+        if not category_id:
             raise SynapseError(400, "category_id cannot be empty string")
 
         if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
             raise SynapseError(
                 400,
-                "category_id may not be longer than %s characters"
-                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                f"category_id may not be longer than {MAX_GROUP_CATEGORYID_LENGTH} characters",
                 Codes.INVALID_PARAM,
             )
+
 
         resp = await self.handler.upsert_group_category(
             group_id, requester_user_id, category_id, content
@@ -1656,7 +1656,7 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if category_id == "":
+        if not category_id:
             raise SynapseError(400, "category_id cannot be empty string")
 
         resp = await self.handler.delete_group_category(
@@ -1726,7 +1726,7 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if role_id == "":
+        if not role_id:
             raise SynapseError(
                 400, "role_id cannot be empty string", Codes.INVALID_PARAM
             )
@@ -1734,10 +1734,10 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
         if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
             raise SynapseError(
                 400,
-                "role_id may not be longer than %s characters"
-                % (MAX_GROUP_ROLEID_LENGTH,),
+                f"role_id may not be longer than {MAX_GROUP_ROLEID_LENGTH} characters",
                 Codes.INVALID_PARAM,
             )
+
 
         resp = await self.handler.update_group_role(
             group_id, requester_user_id, role_id, content
@@ -1759,7 +1759,7 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if role_id == "":
+        if not role_id:
             raise SynapseError(400, "role_id cannot be empty string")
 
         resp = await self.handler.delete_group_role(
@@ -1798,16 +1798,16 @@ class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if role_id == "":
+        if not role_id:
             raise SynapseError(400, "role_id cannot be empty string")
 
         if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
             raise SynapseError(
                 400,
-                "role_id may not be longer than %s characters"
-                % (MAX_GROUP_ROLEID_LENGTH,),
+                f"role_id may not be longer than {MAX_GROUP_ROLEID_LENGTH} characters",
                 Codes.INVALID_PARAM,
             )
+
 
         resp = await self.handler.update_group_summary_user(
             group_id,
@@ -1834,7 +1834,7 @@ class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        if role_id == "":
+        if not role_id:
             raise SynapseError(400, "role_id cannot be empty string")
 
         resp = await self.handler.delete_group_summary_user(

@@ -63,11 +63,7 @@ T = TypeVar("T")
 # TODO(paul): Should be shared somewhere
 def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
     """Return the number of items in it for which func returns true."""
-    n = 0
-    for x in it:
-        if func(x):
-            n += 1
-    return n
+    return sum(bool(func(x)) for x in it)
 
 
 class _NotificationListener:
@@ -381,9 +377,7 @@ class Notifier:
         users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         try:
-            stream_token = None
-            if isinstance(new_token, int):
-                stream_token = new_token
+            stream_token = new_token if isinstance(new_token, int) else None
             self.appservice_handler.notify_interested_services_ephemeral(
                 stream_key, stream_token, users or []
             )
@@ -565,10 +559,9 @@ class Notifier:
         If explicit_room_id is set, that room will be polled for events only if
         it is world readable or the user has joined the room.
         """
-        if pagination_config.from_token:
-            from_token = pagination_config.from_token
-        else:
-            from_token = self.event_sources.get_current_token()
+        from_token = (
+            pagination_config.from_token or self.event_sources.get_current_token()
+        )
 
         limit = pagination_config.limit
 
@@ -576,8 +569,8 @@ class Notifier:
         is_peeking = not is_joined
 
         async def check_for_updates(
-            before_token: StreamToken, after_token: StreamToken
-        ) -> EventStreamResult:
+                before_token: StreamToken, after_token: StreamToken
+            ) -> EventStreamResult:
             if after_token == before_token:
                 return EventStreamResult([], (from_token, from_token))
 
@@ -585,7 +578,7 @@ class Notifier:
             end_token = from_token
 
             for name, source in self.event_sources.sources.items():
-                keyname = "%s_key" % name
+                keyname = f"{name}_key"
                 before_id = getattr(before_token, keyname)
                 after_id = getattr(after_token, keyname)
                 if before_id == after_id:
@@ -632,10 +625,7 @@ class Notifier:
             # over /events.
             #
             # I am sorry for what I have done.
-            user_id_for_stream = "_PEEKING_%s_%s" % (
-                explicit_room_id,
-                user_id_for_stream,
-            )
+            user_id_for_stream = f"_PEEKING_{explicit_room_id}_{user_id_for_stream}"
 
         result = await self.wait_for_events(
             user_id_for_stream,

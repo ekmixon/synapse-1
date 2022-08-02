@@ -86,7 +86,7 @@ class SSOConfig(Config):
         # public_baseurl is an optional setting, so we only add the fallback's URL to the
         # list if it's provided (because we can't figure out what that URL is otherwise).
         if self.public_baseurl:
-            login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
+            login_fallback_url = f"{self.public_baseurl}_matrix/static/client/login"
             self.sso_client_whitelist.append(login_fallback_url)
 
     def generate_config_section(self, **kwargs):

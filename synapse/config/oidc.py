@@ -61,7 +61,7 @@ class OIDCConfig(Config):
         public_baseurl = self.public_baseurl
         if public_baseurl is None:
             raise ConfigError("oidc_config requires a public_baseurl to be set")
-        self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
+        self.oidc_callback_url = f"{public_baseurl}_synapse/client/oidc/callback"
 
     @property
     def oidc_enabled(self) -> bool:
@@ -420,12 +420,11 @@ def _parse_oidc_config_dict(
         "get_remote_user_id",
         "map_user_attributes",
     ]
-    missing_methods = [
+    if missing_methods := [
         method
         for method in required_methods
         if not hasattr(user_mapping_provider_class, method)
-    ]
-    if missing_methods:
+    ]:
         raise ConfigError(
             "Class %s is missing required "
             "methods: %s"
@@ -447,7 +446,7 @@ def _parse_oidc_config_dict(
     # (and thereby invalidating their user_external_ids data).
 
     if idp_id != "oidc":
-        idp_id = "oidc-" + idp_id
+        idp_id = f"oidc-{idp_id}"
 
     # MSC2858 also specifies that the idp_icon must be a valid MXC uri
     idp_icon = oidc_config.get("idp_icon")
@@ -462,8 +461,7 @@ def _parse_oidc_config_dict(
     client_secret_jwt_key_config = oidc_config.get("client_secret_jwt_key")
     client_secret_jwt_key: Optional[OidcProviderClientSecretJwtKey] = None
     if client_secret_jwt_key_config is not None:
-        keyfile = client_secret_jwt_key_config.get("key_file")
-        if keyfile:
+        if keyfile := client_secret_jwt_key_config.get("key_file"):
             key = read_file(keyfile, config_path + ("client_secret_jwt_key",))
         else:
             key = client_secret_jwt_key_config["key"]

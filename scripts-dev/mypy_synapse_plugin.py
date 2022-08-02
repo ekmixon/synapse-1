@@ -50,16 +50,14 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     # First we mark this as a bound function signature.
     signature = bind_self(ctx.default_signature)
 
-    # Secondly, we remove any "cache_context" args.
-    #
-    # Note: We should be only doing this if `cache_context=True` is set, but if
-    # it isn't then the code will raise an exception when its called anyway, so
-    # its not the end of the world.
-    context_arg_index = None
-    for idx, name in enumerate(signature.arg_names):
-        if name == "cache_context":
-            context_arg_index = idx
-            break
+    context_arg_index = next(
+        (
+            idx
+            for idx, name in enumerate(signature.arg_names)
+            if name == "cache_context"
+        ),
+        None,
+    )
 
     arg_types = list(signature.arg_types)
     arg_names = list(signature.arg_names)

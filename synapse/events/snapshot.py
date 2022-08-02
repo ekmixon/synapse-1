@@ -190,8 +190,7 @@ class EventContext:
             rejected=input["rejected"],
         )
 
-        app_service_id = input["app_service_id"]
-        if app_service_id:
+        if app_service_id := input["app_service_id"]:
             context.app_service = storage.main.get_app_service_by_id(app_service_id)
 
         return context

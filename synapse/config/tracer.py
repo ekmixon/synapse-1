@@ -65,7 +65,7 @@ class TracerConfig(Config):
                 )
             self.force_tracing_for_users.add(u)
 
-    def generate_config_section(cls, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## Opentracing ##
 

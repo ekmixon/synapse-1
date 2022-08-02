@@ -117,7 +117,7 @@ class RedirectException(CodeMessageException):
             location: the URI to redirect to
             http_code: the HTTP response code
         """
-        msg = "Redirect to %s" % (location.decode("utf-8"),)
+        msg = f'Redirect to {location.decode("utf-8")}'
         super().__init__(code=http_code, msg=msg)
         self.location = location
 
@@ -229,7 +229,7 @@ class FederationDeniedError(SynapseError):
 
         super().__init__(
             code=403,
-            msg="Federation denied with %s." % (self.destination,),
+            msg=f"Federation denied with {self.destination}.",
             errcode=Codes.FORBIDDEN,
         )
 
@@ -257,10 +257,7 @@ class UnrecognizedRequestError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.UNRECOGNIZED
-        if len(args) == 0:
-            message = "Unrecognized request"
-        else:
-            message = args[0]
+        message = args[0] if args else "Unrecognized request"
         super().__init__(400, message, **kwargs)
 
 
@@ -488,9 +485,9 @@ class RequestSendFailed(RuntimeError):
 
     def __init__(self, inner_exception, can_retry):
         super().__init__(
-            "Failed to send request: %s: %s"
-            % (type(inner_exception).__name__, inner_exception)
+            f"Failed to send request: {type(inner_exception).__name__}: {inner_exception}"
         )
+
         self.inner_exception = inner_exception
         self.can_retry = can_retry
 
@@ -533,14 +530,14 @@ class FederationError(RuntimeError):
         source: Optional[str] = None,
     ):
         if level not in ["FATAL", "ERROR", "WARN"]:
-            raise ValueError("Level is not valid: %s" % (level,))
+            raise ValueError(f"Level is not valid: {level}")
         self.level = level
         self.code = code
         self.reason = reason
         self.affected = affected
         self.source = source
 
-        msg = "%s %s: %s" % (level, code, reason)
+        msg = f"{level} {code}: {reason}"
         super().__init__(msg)
 
     def get_dict(self):
@@ -549,7 +546,7 @@ class FederationError(RuntimeError):
             "code": self.code,
             "reason": self.reason,
             "affected": self.affected,
-            "source": self.source if self.source else self.affected,
+            "source": self.source or self.affected,
         }
 
 

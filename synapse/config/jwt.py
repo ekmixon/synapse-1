@@ -25,8 +25,7 @@ class JWTConfig(Config):
     section = "jwt"
 
     def read_config(self, config, **kwargs):
-        jwt_config = config.get("jwt_config", None)
-        if jwt_config:
+        if jwt_config := config.get("jwt_config", None):
             self.jwt_enabled = jwt_config.get("enabled", False)
             self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]

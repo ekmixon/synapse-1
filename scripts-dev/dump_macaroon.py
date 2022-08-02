@@ -22,4 +22,4 @@ try:
     verifier.verify(macaroon, key)
     print("Signature is correct")
 except Exception as e:
-    print(str(e))
+    print(e)

@@ -33,7 +33,7 @@ def parse_response(content):
 def replicate(server, streams):
     return parse_response(
         requests.get(
-            server + "/_synapse/replication", verify=False, params=streams
+            f"{server}/_synapse/replication", verify=False, params=streams
         ).content
     )
 
@@ -55,7 +55,7 @@ def main():
         try:
             results = replicate(server, streams)
         except Exception:
-            sys.stdout.write("connection_lost(" + repr(streams) + ")\n")
+            sys.stdout.write(f"connection_lost({repr(streams)}" + ")\n")
             break
         for update in results.values():
             for row in update.rows:

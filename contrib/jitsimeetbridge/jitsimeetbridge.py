@@ -52,7 +52,7 @@ class TrivialMatrixClient:
                 + "&timeout=60000"
             )
             if self.token:
-                url += "&from=" + self.token
+                url += f"&from={self.token}"
             req = grequests.get(url)
             resps = grequests.map([req])
             obj = json.loads(resps[0].content)
@@ -64,7 +64,7 @@ class TrivialMatrixClient:
                 return obj["chunk"][0]
 
     def joinRoom(self, roomId):
-        url = MATRIXBASE + "rooms/" + roomId + "/join?access_token=" + self.access_token
+        url = f"{MATRIXBASE}rooms/{roomId}/join?access_token={self.access_token}"
         print(url)
         headers = {"Content-Type": "application/json"}
         req = grequests.post(url, headers=headers, data="{}")
@@ -102,7 +102,7 @@ def matrixLoop():
             print("membership event")
             if ev["membership"] == "invite" and ev["state_key"] == MYUSERNAME:
                 roomId = ev["room_id"]
-                print("joining room %s" % (roomId))
+                print(f"joining room {roomId}")
                 matrixCli.joinRoom(roomId)
         elif ev["type"] == "m.room.message":
             if ev["room_id"] in xmppClients:
@@ -158,8 +158,7 @@ class TrivialXmppClient:
         headers = {"Content-Type": "application/xml"}
         req = grequests.post(HTTPBIND, verify=False, headers=headers, data=xml)
         resps = grequests.map([req])
-        obj = BeautifulSoup(resps[0].content)
-        return obj
+        return BeautifulSoup(resps[0].content)
 
     def sendAnswer(self, answer):
         print("sdp from matrix client", answer)
@@ -193,12 +192,16 @@ class TrivialXmppClient:
         time.sleep(7)
         print("SSRC spammer started")
         while self.running:
-            ssrcMsg = "<presence to='%(tojid)s' xmlns='jabber:client'><x xmlns='http://jabber.org/protocol/muc'/><c xmlns='http://jabber.org/protocol/caps' hash='sha-1' node='http://jitsi.org/jitsimeet' ver='0WkSdhFnAUxrz4ImQQLdB80GFlE='/><nick xmlns='http://jabber.org/protocol/nick'>%(nick)s</nick><stats xmlns='http://jitsi.org/jitmeet/stats'><stat name='bitrate_download' value='175'/><stat name='bitrate_upload' value='176'/><stat name='packetLoss_total' value='0'/><stat name='packetLoss_download' value='0'/><stat name='packetLoss_upload' value='0'/></stats><media xmlns='http://estos.de/ns/mjs'><source type='audio' ssrc='%(assrc)s' direction='sendre'/><source type='video' ssrc='%(vssrc)s' direction='sendre'/></media></presence>" % {
-                "tojid": "%s@%s/%s" % (ROOMNAME, ROOMDOMAIN, self.shortJid),
-                "nick": self.userId,
-                "assrc": self.ssrcs["audio"],
-                "vssrc": self.ssrcs["video"],
-            }
+            ssrcMsg = (
+                "<presence to='%(tojid)s' xmlns='jabber:client'><x xmlns='http://jabber.org/protocol/muc'/><c xmlns='http://jabber.org/protocol/caps' hash='sha-1' node='http://jitsi.org/jitsimeet' ver='0WkSdhFnAUxrz4ImQQLdB80GFlE='/><nick xmlns='http://jabber.org/protocol/nick'>%(nick)s</nick><stats xmlns='http://jitsi.org/jitmeet/stats'><stat name='bitrate_download' value='175'/><stat name='bitrate_upload' value='176'/><stat name='packetLoss_total' value='0'/><stat name='packetLoss_download' value='0'/><stat name='packetLoss_upload' value='0'/></stats><media xmlns='http://estos.de/ns/mjs'><source type='audio' ssrc='%(assrc)s' direction='sendre'/><source type='video' ssrc='%(vssrc)s' direction='sendre'/></media></presence>"
+                % {
+                    "tojid": f"{ROOMNAME}@{ROOMDOMAIN}/{self.shortJid}",
+                    "nick": self.userId,
+                    "assrc": self.ssrcs["audio"],
+                    "vssrc": self.ssrcs["video"],
+                }
+            )
+
             res = self.sendIq(ssrcMsg)
             print("reply from ssrc announce: ", res)
             time.sleep(10)
@@ -212,7 +215,7 @@ class TrivialXmppClient:
 
         print(res)
         self.sid = res.body["sid"]
-        print("sid %s" % (self.sid))
+        print(f"sid {self.sid}")
 
         res = self.sendIq(
             "<auth xmlns='urn:ietf:params:xml:ns:xmpp-sasl' mechanism='ANONYMOUS'/>"
@@ -229,7 +232,7 @@ class TrivialXmppClient:
         print(res)
 
         self.jid = res.body.iq.bind.jid.string
-        print("jid: %s" % (self.jid))
+        print(f"jid: {self.jid}")
         self.shortJid = self.jid.split("-")[0]
 
         res = self.sendIq(
@@ -248,8 +251,7 @@ class TrivialXmppClient:
         )
         self.muc = {"users": []}
         for p in res.body.findAll("presence"):
-            u = {}
-            u["shortJid"] = p["from"].split("/")[1]
+            u = {"shortJid": p["from"].split("/")[1]}
             if p.c and p.c.nick:
                 u["nick"] = p.c.nick.string
             self.muc["users"].append(u)
@@ -278,7 +280,7 @@ class TrivialXmppClient:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
-        print("raw jingle invite", str(jingle))
+        print("raw jingle invite", jingle)
         sdp, out_err = p.communicate(str(jingle))
         print("transformed remote offer sdp", sdp)
         inviteEvent = {

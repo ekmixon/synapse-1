@@ -70,38 +70,34 @@ class InputOutput:
         """This is where we process commands."""
 
         try:
-            m = re.match(r"^join (\S+)$", line)
-            if m:
+            if m := re.match(r"^join (\S+)$", line):
                 # The `sender` wants to join a room.
                 (room_name,) = m.groups()
-                self.print_line("%s joining %s" % (self.user, room_name))
+                self.print_line(f"{self.user} joining {room_name}")
                 self.server.join_room(room_name, self.user, self.user)
                 # self.print_line("OK.")
                 return
 
-            m = re.match(r"^invite (\S+) (\S+)$", line)
-            if m:
+            if m := re.match(r"^invite (\S+) (\S+)$", line):
                 # `sender` wants to invite someone to a room
                 room_name, invitee = m.groups()
-                self.print_line("%s invited to %s" % (invitee, room_name))
+                self.print_line(f"{invitee} invited to {room_name}")
                 self.server.invite_to_room(room_name, self.user, invitee)
                 # self.print_line("OK.")
                 return
 
-            m = re.match(r"^send (\S+) (.*)$", line)
-            if m:
+            if m := re.match(r"^send (\S+) (.*)$", line):
                 # `sender` wants to message a room
                 room_name, body = m.groups()
-                self.print_line("%s send to %s" % (self.user, room_name))
+                self.print_line(f"{self.user} send to {room_name}")
                 self.server.send_message(room_name, self.user, body)
                 # self.print_line("OK.")
                 return
 
-            m = re.match(r"^backfill (\S+)$", line)
-            if m:
+            if m := re.match(r"^backfill (\S+)$", line):
                 # we want to backfill a room
                 (room_name,) = m.groups()
-                self.print_line("backfill %s" % room_name)
+                self.print_line(f"backfill {room_name}")
                 self.server.backfill(room_name)
                 return
 
@@ -189,14 +185,13 @@ class HomeServer(ReplicationHandler):
                 self._on_invite(pdu.origin, pdu.context, pdu.state_key)
         else:
             self.output.print_line(
-                "#%s (unrec) %s = %s"
-                % (pdu.context, pdu.pdu_type, json.dumps(pdu.content))
+                f"#{pdu.context} (unrec) {pdu.pdu_type} = {json.dumps(pdu.content)}"
             )
 
     def _on_message(self, pdu):
         """We received a message"""
         self.output.print_line(
-            "#%s %s %s" % (pdu.context, pdu.content["sender"], pdu.content["body"])
+            f'#{pdu.context} {pdu.content["sender"]} {pdu.content["body"]}'
         )
 
     def _on_join(self, context, joinee):
@@ -204,14 +199,14 @@ class HomeServer(ReplicationHandler):
         room = self._get_or_create_room(context)
         room.add_participant(joinee)
 
-        self.output.print_line("#%s %s %s" % (context, joinee, "*** JOINED"))
+        self.output.print_line(f"#{context} {joinee} *** JOINED")
 
     def _on_invite(self, origin, context, invitee):
         """Someone has been invited"""
         room = self._get_or_create_room(context)
         room.add_invited(invitee)
 
-        self.output.print_line("#%s %s %s" % (context, invitee, "*** INVITED"))
+        self.output.print_line(f"#{context} {invitee} *** INVITED")
 
         if not room.have_got_metadata and origin is not self.server_name:
             logger.debug("Get room state")
@@ -319,7 +314,7 @@ def main(stdscr):
     )
     if not os.path.exists("logs"):
         os.makedirs("logs")
-    fh = logging.FileHandler("logs/%s" % user)
+    fh = logging.FileHandler(f"logs/{user}")
     fh.setFormatter(formatter)
 
     root_logger.addHandler(fh)
@@ -337,7 +332,7 @@ def main(stdscr):
 
     curses_stdio.set_callback(input_output)
 
-    app_hs = SynapseHomeServer(server_name, db_name="dbs/%s" % user)
+    app_hs = SynapseHomeServer(server_name, db_name=f"dbs/{user}")
     replication = app_hs.get_replication_layer()
 
     hs = HomeServer(server_name, replication, curses_stdio)

@@ -123,12 +123,12 @@ class SynapseCmd(cmd.Cmd):
             ]
             for key, valid_vals in config_rules:
                 if key == args["key"] and args["val"] not in valid_vals:
-                    print("%s value must be one of %s" % (args["key"], valid_vals))
+                    print(f'{args["key"]} value must be one of {valid_vals}')
                     return
 
             # toggle the http client verbosity
             if args["key"] == "verbose":
-                self.http_client.verbose = "on" == args["val"]
+                self.http_client.verbose = args["val"] == "on"
 
             # assign the new config
             self.config[args["key"]] = args["val"]
@@ -168,7 +168,7 @@ class SynapseCmd(cmd.Cmd):
     @defer.inlineCallbacks
     def _do_register(self, data, update_config):
         # check the registration flows
-        url = self._url() + "/register"
+        url = f"{self._url()}/register"
         json_res = yield self.http_client.do_request("GET", url)
         print(json.dumps(json_res, indent=4))
 
@@ -199,17 +199,16 @@ class SynapseCmd(cmd.Cmd):
         """
         try:
             args = self._parse(line, ["user_id"], force_keys=True)
-            can_login = threads.blockingCallFromThread(reactor, self._check_can_login)
-            if can_login:
+            if can_login := threads.blockingCallFromThread(
+                reactor, self._check_can_login
+            ):
                 p = getpass.getpass("Enter your password: ")
                 user = args["user_id"]
                 if self._is_on("complete_usernames") and not user.startswith("@"):
-                    domain = self._domain()
-                    if domain:
-                        user = "@" + user + ":" + domain
+                    if domain := self._domain():
+                        user = f"@{user}:{domain}"
 
                 reactor.callFromThread(self._do_login, user, p)
-                # print " got %s " % p
         except Exception as e:
             print(e)
 
@@ -241,8 +240,12 @@ class SynapseCmd(cmd.Cmd):
             defer.returnValue(False)
 
         flow = json_res["flows"][0]  # assume first is the one we want.
-        if "type" not in flow or "m.login.password" != flow["type"] or "stages" in flow:
-            fallback_url = self._url() + "/login/fallback"
+        if (
+            "type" not in flow
+            or flow["type"] != "m.login.password"
+            or "stages" in flow
+        ):
+            fallback_url = f"{self._url()}/login/fallback"
             print(
                 "Unable to login via the command line client. Please visit "
                 "%s to login." % fallback_url
@@ -283,7 +286,7 @@ class SynapseCmd(cmd.Cmd):
         )
         print(json_res)
         if "sid" in json_res:
-            print("Token sent. Your session ID is %s" % (json_res["sid"]))
+            print(f'Token sent. Your session ID is {json_res["sid"]}')
 
     def do_emailvalidate(self, line):
         """Validate and associate a third party ID
@@ -325,15 +328,18 @@ class SynapseCmd(cmd.Cmd):
         """
         args = self._parse(line, ["sid", "clientSecret"])
 
-        postArgs = {"sid": args["sid"], "clientSecret": args["clientSecret"]}
-        postArgs["mxid"] = self.config["user"]
+        postArgs = {
+            "sid": args["sid"],
+            "clientSecret": args["clientSecret"],
+            "mxid": self.config["user"],
+        }
 
         reactor.callFromThread(self._do_3pidbind, postArgs)
 
     @defer.inlineCallbacks
     def _do_3pidbind(self, args):
         # TODO: Update to use v2 Identity Service API endpoint
-        url = self._identityServerUrl() + "/_matrix/identity/api/v1/3pid/bind"
+        url = f"{self._identityServerUrl()}/_matrix/identity/api/v1/3pid/bind"
 
         json_res = yield self.http_client.do_request(
             "POST",
@@ -355,7 +361,7 @@ class SynapseCmd(cmd.Cmd):
     def do_joinalias(self, line):
         try:
             args = self._parse(line, ["roomname"], force_keys=True)
-            path = "/join/%s" % urllib.quote(args["roomname"])
+            path = f'/join/{urllib.quote(args["roomname"])}'
             reactor.callFromThread(self._run_and_pprint, "POST", path, {})
         except Exception as e:
             print(e)
@@ -371,10 +377,10 @@ class SynapseCmd(cmd.Cmd):
                 print("Must specify set|get and a room ID.")
                 return
             if args["action"].lower() not in ["set", "get"]:
-                print("Must specify set|get, not %s" % args["action"])
+                print(f'Must specify set|get, not {args["action"]}')
                 return
 
-            path = "/rooms/%s/topic" % urllib.quote(args["roomid"])
+            path = f'/rooms/{urllib.quote(args["roomid"])}/topic'
 
             if args["action"].lower() == "set":
                 if "topic" not in args:
@@ -400,67 +406,65 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_invite(self, roomid, userstring):
-        if not userstring.startswith("@") and self._is_on("complete_usernames"):
+        if userstring.startswith("@") or not self._is_on("complete_usernames"):
+            return
             # TODO: Update to use v2 Identity Service API endpoint
-            url = self._identityServerUrl() + "/_matrix/identity/api/v1/lookup"
+        url = f"{self._identityServerUrl()}/_matrix/identity/api/v1/lookup"
 
-            json_res = yield self.http_client.do_request(
-                "GET", url, qparams={"medium": "email", "address": userstring}
+        json_res = yield self.http_client.do_request(
+            "GET", url, qparams={"medium": "email", "address": userstring}
+        )
+
+        mxid = None
+
+        if "mxid" in json_res and "signatures" in json_res:
+            # TODO: Update to use v2 Identity Service API endpoint
+            url = (
+                self._identityServerUrl()
+                + "/_matrix/identity/api/v1/pubkey/ed25519"
             )
 
-            mxid = None
+            pubKey = None
+            pubKeyObj = yield self.http_client.do_request("GET", url)
+            if "public_key" in pubKeyObj:
+                pubKey = nacl.signing.VerifyKey(
+                    pubKeyObj["public_key"], encoder=nacl.encoding.HexEncoder
+                )
+            else:
+                print("No public key found in pubkey response!")
 
-            if "mxid" in json_res and "signatures" in json_res:
-                # TODO: Update to use v2 Identity Service API endpoint
-                url = (
-                    self._identityServerUrl()
-                    + "/_matrix/identity/api/v1/pubkey/ed25519"
+            sigValid = False
+
+            if pubKey:
+                for signame in json_res["signatures"]:
+                    if signame not in TRUSTED_ID_SERVERS:
+                        print(f"Ignoring signature from untrusted server {signame}")
+                    else:
+                        try:
+                            verify_signed_json(json_res, signame, pubKey)
+                            sigValid = True
+                            print(
+                                f'Mapping {userstring} -> {json_res["mxid"]} correctly signed by {signame}'
+                            )
+
+                            break
+                        except SignatureVerifyException as e:
+                            print(f"Invalid signature from {signame}")
+                            print(e)
+
+            if sigValid:
+                print(f'Resolved 3pid {userstring} to {json_res["mxid"]}')
+                mxid = json_res["mxid"]
+            else:
+                print(
+                    "Got association for %s but couldn't verify signature"
+                    % (userstring)
                 )
 
-                pubKey = None
-                pubKeyObj = yield self.http_client.do_request("GET", url)
-                if "public_key" in pubKeyObj:
-                    pubKey = nacl.signing.VerifyKey(
-                        pubKeyObj["public_key"], encoder=nacl.encoding.HexEncoder
-                    )
-                else:
-                    print("No public key found in pubkey response!")
+        if not mxid:
+            mxid = f"@{userstring}:{self._domain()}"
 
-                sigValid = False
-
-                if pubKey:
-                    for signame in json_res["signatures"]:
-                        if signame not in TRUSTED_ID_SERVERS:
-                            print(
-                                "Ignoring signature from untrusted server %s"
-                                % (signame)
-                            )
-                        else:
-                            try:
-                                verify_signed_json(json_res, signame, pubKey)
-                                sigValid = True
-                                print(
-                                    "Mapping %s -> %s correctly signed by %s"
-                                    % (userstring, json_res["mxid"], signame)
-                                )
-                                break
-                            except SignatureVerifyException as e:
-                                print("Invalid signature from %s" % (signame))
-                                print(e)
-
-                if sigValid:
-                    print("Resolved 3pid %s to %s" % (userstring, json_res["mxid"]))
-                    mxid = json_res["mxid"]
-                else:
-                    print(
-                        "Got association for %s but couldn't verify signature"
-                        % (userstring)
-                    )
-
-            if not mxid:
-                mxid = "@" + userstring + ":" + self._domain()
-
-            self._do_membership_change(roomid, "invite", mxid)
+        self._do_membership_change(roomid, "invite", mxid)
 
     def do_leave(self, line):
         """Leaves a room: "leave <roomid>" """
@@ -473,11 +477,8 @@ class SynapseCmd(cmd.Cmd):
     def do_send(self, line):
         """Sends a message. "send <roomid> <body>" """
         args = self._parse(line, ["roomid", "body"])
-        txn_id = "txn%s" % int(time.time())
-        path = "/rooms/%s/send/m.room.message/%s" % (
-            urllib.quote(args["roomid"]),
-            txn_id,
-        )
+        txn_id = f"txn{int(time.time())}"
+        path = f'/rooms/{urllib.quote(args["roomid"])}/send/m.room.message/{txn_id}'
         body_json = {"msgtype": "m.text", "body": args["body"]}
         reactor.callFromThread(self._run_and_pprint, "PUT", path, body_json)
 
@@ -495,10 +496,10 @@ class SynapseCmd(cmd.Cmd):
             print("Must specify type and room ID.")
             return
         if args["type"] not in ["members", "messages"]:
-            print("Unrecognised type: %s" % args["type"])
+            print(f'Unrecognised type: {args["type"]}')
             return
         room_id = args["roomid"]
-        path = "/rooms/%s/%s" % (urllib.quote(room_id), args["type"])
+        path = f'/rooms/{urllib.quote(room_id)}/{args["type"]}'
 
         qp = {"access_token": self._tok()}
         if "qp" in args:
@@ -507,7 +508,7 @@ class SynapseCmd(cmd.Cmd):
                     key_value = key_value_str.split("=")
                     qp[key_value[0]] = key_value[1]
                 except Exception:
-                    print("Bad query param: %s" % key_value)
+                    print(f"Bad query param: {key_value}")
                     return
 
         reactor.callFromThread(self._run_and_pprint, "GET", path, query_params=qp)
@@ -561,7 +562,7 @@ class SynapseCmd(cmd.Cmd):
             "XDELETE",
         ]
         if args["method"] not in valid_methods:
-            print("Unsupported method: %s" % args["method"])
+            print(f'Unsupported method: {args["method"]}')
             return
 
         if "data" not in args:
@@ -570,7 +571,7 @@ class SynapseCmd(cmd.Cmd):
             try:
                 args["data"] = json.loads(args["data"])
             except Exception as e:
-                print("Data is not valid JSON. %s" % e)
+                print(f"Data is not valid JSON. {e}")
                 return
 
         qp = {"access_token": self._tok()}
@@ -581,7 +582,7 @@ class SynapseCmd(cmd.Cmd):
             # append any query params the user has set
             try:
                 parsed_url = urlparse.urlparse(args["path"])
-                qp.update(urlparse.parse_qs(parsed_url.query))
+                qp |= urlparse.parse_qs(parsed_url.query)
                 args["path"] = parsed_url.path
             except Exception:
                 pass
@@ -610,7 +611,7 @@ class SynapseCmd(cmd.Cmd):
     def _do_event_stream(self, timeout):
         res = yield defer.ensureDeferred(
             self.http_client.get_json(
-                self._url() + "/events",
+                f"{self._url()}/events",
                 {
                     "access_token": self._tok(),
                     "timeout": str(timeout),
@@ -618,6 +619,7 @@ class SynapseCmd(cmd.Cmd):
                 },
             )
         )
+
         print(json.dumps(res, indent=4))
 
         if "chunk" in res:
@@ -634,34 +636,27 @@ class SynapseCmd(cmd.Cmd):
             self.event_stream_token = res["end"]
 
     def _send_receipt(self, event, feedback_type):
-        path = "/rooms/%s/messages/%s/%s/feedback/%s/%s" % (
-            urllib.quote(event["room_id"]),
-            event["user_id"],
-            event["msg_id"],
-            self._usr(),
-            feedback_type,
-        )
+        path = f'/rooms/{urllib.quote(event["room_id"])}/messages/{event["user_id"]}/{event["msg_id"]}/feedback/{self._usr()}/{feedback_type}'
+
         data = {}
         reactor.callFromThread(
             self._run_and_pprint,
             "PUT",
             path,
             data=data,
-            alt_text="Sent receipt for %s" % event["msg_id"],
+            alt_text=f'Sent receipt for {event["msg_id"]}',
         )
 
     def _do_membership_change(self, roomid, membership, userid):
-        path = "/rooms/%s/state/m.room.member/%s" % (
-            urllib.quote(roomid),
-            urllib.quote(userid),
-        )
+        path = f"/rooms/{urllib.quote(roomid)}/state/m.room.member/{urllib.quote(userid)}"
+
         data = {"membership": membership}
         reactor.callFromThread(self._run_and_pprint, "PUT", path, data=data)
 
     def do_displayname(self, line):
         """Get or set my displayname: "displayname [new_name]" """
         args = self._parse(line, ["name"])
-        path = "/profile/%s/displayname" % (self.config["user"])
+        path = f'/profile/{self.config["user"]}/displayname'
 
         if "name" in args:
             data = {"displayname": args["name"]}
@@ -671,7 +666,7 @@ class SynapseCmd(cmd.Cmd):
 
     def _do_presence_state(self, state, line):
         args = self._parse(line, ["msgstring"])
-        path = "/presence/%s/status" % (self.config["user"])
+        path = f'/presence/{self.config["user"]}/status'
         data = {"state": state}
         if "msgstring" in args:
             data["status_msg"] = args["msgstring"]
@@ -702,13 +697,13 @@ class SynapseCmd(cmd.Cmd):
         """
         line_args = shlex.split(line)
         if force_keys and len(line_args) != len(keys):
-            raise IndexError("Must specify all args: %s" % keys)
+            raise IndexError(f"Must specify all args: {keys}")
 
         # do $ substitutions
         for i, arg in enumerate(line_args):
             for config_key in self.config:
-                if ("$" + config_key) in arg:
-                    arg = arg.replace("$" + config_key, self.config[config_key])
+                if f"${config_key}" in arg:
+                    arg = arg.replace(f"${config_key}", self.config[config_key])
             line_args[i] = arg
 
         return dict(zip(keys, line_args))
@@ -753,7 +748,7 @@ def save_config(config):
 def main(server_url, identity_server_url, username, token, config_path):
     print("Synapse command line client")
     print("===========================")
-    print("Server: %s" % server_url)
+    print(f"Server: {server_url}")
     print("Type 'help' to get started.")
     print("Close this console with CTRL+C then CTRL+D.")
     if not username or not token:
@@ -773,10 +768,10 @@ def main(server_url, identity_server_url, username, token, config_path):
         with open(config_path, "r") as config:
             syn_cmd.config = json.load(config)
             try:
-                http_client.verbose = "on" == syn_cmd.config["verbose"]
+                http_client.verbose = syn_cmd.config["verbose"] == "on"
             except Exception:
                 pass
-            print("Loaded config from %s" % config_path)
+            print(f"Loaded config from {config_path}")
     except Exception:
         pass
 
@@ -823,6 +818,6 @@ if __name__ == "__main__":
 
     server = args.server
     if not server.startswith("http://"):
-        server = "http://" + args.server
+        server = f"http://{args.server}"
 
     main(server, args.identityserver, args.username, args.token, args.config)

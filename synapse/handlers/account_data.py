@@ -178,26 +178,27 @@ class AccountDataEventSource:
 
         current_stream_id = self.store.get_max_account_data_stream_id()
 
-        results = []
         tags = await self.store.get_updated_tags(user_id, last_stream_id)
 
-        for room_id, room_tags in tags.items():
-            results.append(
-                {"type": "m.tag", "content": {"tags": room_tags}, "room_id": room_id}
-            )
+        results = [
+            {"type": "m.tag", "content": {"tags": room_tags}, "room_id": room_id}
+            for room_id, room_tags in tags.items()
+        ]
 
         (
             account_data,
             room_account_data,
         ) = await self.store.get_updated_account_data_for_user(user_id, last_stream_id)
 
-        for account_data_type, content in account_data.items():
-            results.append({"type": account_data_type, "content": content})
+        results.extend(
+            {"type": account_data_type, "content": content}
+            for account_data_type, content in account_data.items()
+        )
 
         for room_id, account_data in room_account_data.items():
-            for account_data_type, content in account_data.items():
-                results.append(
-                    {"type": account_data_type, "content": content, "room_id": room_id}
-                )
+            results.extend(
+                {"type": account_data_type, "content": content, "room_id": room_id}
+                for account_data_type, content in account_data.items()
+            )
 
         return results, current_stream_id

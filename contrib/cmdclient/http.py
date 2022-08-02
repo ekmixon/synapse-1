@@ -80,7 +80,7 @@ class TwistedHttpClient(HttpClient):
         if args:
             # generates a list of strings of form "k=v".
             qs = urllib.urlencode(args, True)
-            url = "%s?%s" % (url, qs)
+            url = f"{url}?{qs}"
         response = yield self._create_get_request(url)
         body = yield readBody(response)
         defer.returnValue(json.loads(body))
@@ -113,7 +113,7 @@ class TwistedHttpClient(HttpClient):
         headers = headers or {}
 
         if qparams:
-            url = "%s?%s" % (url, urllib.urlencode(qparams, True))
+            url = f"{url}?{urllib.urlencode(qparams, True)}"
 
         if jsonreq:
             prod = _JsonProducer(data)
@@ -141,7 +141,7 @@ class TwistedHttpClient(HttpClient):
         headers_dict["User-Agent"] = ["Synapse Cmd Client"]
 
         retries_left = 5
-        print("%s to %s with headers %s" % (method, url, headers_dict))
+        print(f"{method} to {url} with headers {headers_dict}")
         if self.verbose and producer:
             if "password" in producer.data:
                 temp = producer.data["password"]
@@ -158,15 +158,14 @@ class TwistedHttpClient(HttpClient):
                 )
                 break
             except Exception as e:
-                print("uh oh: %s" % e)
-                if retries_left:
-                    yield self.sleep(2 ** (5 - retries_left))
-                    retries_left -= 1
-                else:
+                print(f"uh oh: {e}")
+                if not retries_left:
                     raise e
 
+                yield self.sleep(2 ** (5 - retries_left))
+                retries_left -= 1
         if self.verbose:
-            print("Status %s %s" % (response.code, response.phrase))
+            print(f"Status {response.code} {response.phrase}")
             print(pformat(list(response.headers.getAllRawHeaders())))
         defer.returnValue(response)
 

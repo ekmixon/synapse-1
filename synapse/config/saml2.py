@@ -107,9 +107,9 @@ class SAML2Config(Config):
         ump_dict["config"] = ump_dict.get("config") or {}
 
         if ump_dict["module"] == DEFAULT_USER_MAPPING_PROVIDER:
-            # Load deprecated options for use by the default module
-            old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
-            if old_mxid_source_attribute:
+            if old_mxid_source_attribute := saml2_config.get(
+                "mxid_source_attribute"
+            ):
                 logger.warning(
                     "The config option saml2_config.mxid_source_attribute is deprecated. "
                     "Please use saml2_config.user_mapping_provider.config"
@@ -117,8 +117,7 @@ class SAML2Config(Config):
                 )
                 ump_dict["config"]["mxid_source_attribute"] = old_mxid_source_attribute
 
-            old_mxid_mapping = saml2_config.get("mxid_mapping")
-            if old_mxid_mapping:
+            if old_mxid_mapping := saml2_config.get("mxid_mapping"):
                 logger.warning(
                     "The config option saml2_config.mxid_mapping is deprecated. Please "
                     "use saml2_config.user_mapping_provider.config.mxid_mapping instead."
@@ -139,12 +138,11 @@ class SAML2Config(Config):
             "saml_response_to_user_attributes",
             "get_remote_user_id",
         ]
-        missing_methods = [
+        if missing_methods := [
             method
             for method in required_methods
             if not hasattr(self.saml2_user_mapping_provider_class, method)
-        ]
-        if missing_methods:
+        ]:
             raise ConfigError(
                 "Class specified by saml2_config."
                 "user_mapping_provider.module is missing required "
@@ -207,8 +205,8 @@ class SAML2Config(Config):
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes
 
-        metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
-        response_url = public_baseurl + "_synapse/client/saml2/authn_response"
+        metadata_url = f"{public_baseurl}_synapse/client/saml2/metadata.xml"
+        response_url = f"{public_baseurl}_synapse/client/saml2/authn_response"
         return {
             "entityid": metadata_url,
             "service": {

@@ -91,9 +91,7 @@ class DefaultDictProperty(DictProperty):
         self.default = default
 
     def __get__(self, instance, owner=None):
-        if instance is None:
-            return self
-        return instance._dict.get(self.key, self.default)
+        return self if instance is None else instance._dict.get(self.key, self.default)
 
 
 class _EventInternalMetadata:
@@ -267,10 +265,10 @@ class EventBase(metaclass=abc.ABCMeta):
         return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self) -> JsonDict:
-        d = dict(self._dict)
-        d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
-
-        return d
+        return dict(self._dict) | {
+            "signatures": self.signatures,
+            "unsigned": dict(self.unsigned),
+        }
 
     def get(self, key, default=None):
         return self._dict.get(key, default)
@@ -306,7 +304,7 @@ class EventBase(metaclass=abc.ABCMeta):
         return template_json
 
     def __set__(self, instance, value):
-        raise AttributeError("Unrecognized attribute %s" % (instance,))
+        raise AttributeError(f"Unrecognized attribute {instance}")
 
     def __getitem__(self, field):
         return self._dict[field]
@@ -362,9 +360,10 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
+
 
         unsigned = dict(event_dict.pop("unsigned", {}))
 
@@ -372,11 +371,7 @@ class FrozenEvent(EventBase):
         # caching).
         event_dict = intern_dict(event_dict)
 
-        if USE_FROZEN_DICTS:
-            frozen_dict = freeze(event_dict)
-        else:
-            frozen_dict = event_dict
-
+        frozen_dict = freeze(event_dict) if USE_FROZEN_DICTS else event_dict
         self._event_id = event_dict["event_id"]
 
         super().__init__(
@@ -420,9 +415,10 @@ class FrozenEventV2(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
+
 
         assert "event_id" not in event_dict
 
@@ -432,11 +428,7 @@ class FrozenEventV2(EventBase):
         # caching).
         event_dict = intern_dict(event_dict)
 
-        if USE_FROZEN_DICTS:
-            frozen_dict = freeze(event_dict)
-        else:
-            frozen_dict = event_dict
-
+        frozen_dict = freeze(event_dict) if USE_FROZEN_DICTS else event_dict
         self._event_id = None
 
         super().__init__(
@@ -456,7 +448,7 @@ class FrozenEventV2(EventBase):
 
         if self._event_id:
             return self._event_id
-        self._event_id = "$" + encode_base64(compute_event_reference_hash(self)[1])
+        self._event_id = f"${encode_base64(compute_event_reference_hash(self)[1])}"
         return self._event_id
 
     def prev_event_ids(self):
@@ -502,9 +494,8 @@ class FrozenEventV3(FrozenEventV2):
 
         if self._event_id:
             return self._event_id
-        self._event_id = "$" + encode_base64(
-            compute_event_reference_hash(self)[1], urlsafe=True
-        )
+        self._event_id = f"${encode_base64(compute_event_reference_hash(self)[1], urlsafe=True)}"
+
         return self._event_id
 
 

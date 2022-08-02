@@ -198,9 +198,7 @@ async def filter_events_for_client(
 
             # Always allow the user to see their own leave events, otherwise
             # they won't see the room disappear if they reject the invite
-            if membership == "leave" and (
-                prev_membership == "join" or prev_membership == "invite"
-            ):
+            if membership == "leave" and prev_membership in ["join", "invite"]:
                 return event
 
             new_priority = MEMBERSHIP_PRIORITY.index(membership)
@@ -246,10 +244,7 @@ async def filter_events_for_client(
         # not a member at the time. We allow it, provided the original sender
         # has not requested their data to be erased, in which case, we return
         # a redacted version.
-        if erased_senders[event.sender]:
-            return prune_event(event)
-
-        return event
+        return prune_event(event) if erased_senders[event.sender] else event
 
     # Check each event: gives an iterable of None or (a potentially modified)
     # EventBase.
@@ -352,12 +347,11 @@ async def filter_events_for_server(
             for e in event_map.values()
         )
 
-    if not check_history_visibility_only:
-        erased_senders = await storage.main.are_users_erased(e.sender for e in events)
-    else:
-        # We don't want to check whether users are erased, which is equivalent
-        # to no users having been erased.
-        erased_senders = {}
+    erased_senders = (
+        {}
+        if check_history_visibility_only
+        else await storage.main.are_users_erased(e.sender for e in events)
+    )
 
     if all_open:
         # all the history_visibility state affecting these events is open, so
@@ -408,9 +402,7 @@ async def filter_events_for_server(
 
         # we avoid using get_domain_from_id here for efficiency.
         idx = state_key.find(":")
-        if idx == -1:
-            return False
-        return state_key[idx + 1 :] == server_name
+        return False if idx == -1 else state_key[idx + 1 :] == server_name
 
     event_map = await storage.main.get_events(
         [e_id for e_id, key in event_id_to_state_key.items() if include(key[0], key[1])]

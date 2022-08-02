@@ -101,7 +101,7 @@ class SynapseHomeServer(HomeServer):
                     # Skip loading openid resource if federation is defined
                     # since federation resource will include openid
                     continue
-                resources.update(self._configure_named_resource(name, res.compress))
+                resources |= self._configure_named_resource(name, res.compress)
 
         additional_resources = listener_config.http_options.additional_resources
         logger.debug("Configuring additional resources: %r", additional_resources)
@@ -109,8 +109,9 @@ class SynapseHomeServer(HomeServer):
         for path, resmodule in additional_resources.items():
             handler_cls, config = load_module(
                 resmodule,
-                ("listeners", site_tag, "additional_resources", "<%s>" % (path,)),
+                ("listeners", site_tag, "additional_resources", f"<{path}>"),
             )
+
             handler = handler_cls(config, module_api)
             if IResource.providedBy(handler):
                 resource = handler
@@ -118,9 +119,9 @@ class SynapseHomeServer(HomeServer):
                 resource = AdditionalResource(self, handler.handle_request)
             else:
                 raise ConfigError(
-                    "additional_resource %s does not implement a known interface"
-                    % (resmodule["module"],)
+                    f'additional_resource {resmodule["module"]} does not implement a known interface'
                 )
+
             resources[path] = resource
 
         # Attach additional resources registered by modules.
@@ -136,7 +137,7 @@ class SynapseHomeServer(HomeServer):
             root_resource = OptionsResource()
 
         site = SynapseSite(
-            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+            f'synapse.access.{"https" if tls else "http"}.{site_tag}',
             site_tag,
             listener_config,
             create_resource_tree(resources, root_resource),
@@ -144,6 +145,7 @@ class SynapseHomeServer(HomeServer):
             max_request_body_size=max_request_body_size(self.config),
             reactor=self.get_reactor(),
         )
+
 
         if tls:
             ports = listen_ssl(
@@ -183,18 +185,17 @@ class SynapseHomeServer(HomeServer):
             if compress:
                 client_resource = gz_wrap(client_resource)
 
-            resources.update(
-                {
-                    "/_matrix/client/api/v1": client_resource,
-                    "/_matrix/client/r0": client_resource,
-                    "/_matrix/client/unstable": client_resource,
-                    "/_matrix/client/v2_alpha": client_resource,
-                    "/_matrix/client/versions": client_resource,
-                    "/.well-known/matrix/client": WellKnownResource(self),
-                    "/_synapse/admin": AdminRestResource(self),
-                    **build_synapse_client_resource_tree(self),
-                }
-            )
+            resources |= {
+                "/_matrix/client/api/v1": client_resource,
+                "/_matrix/client/r0": client_resource,
+                "/_matrix/client/unstable": client_resource,
+                "/_matrix/client/v2_alpha": client_resource,
+                "/_matrix/client/versions": client_resource,
+                "/.well-known/matrix/client": WellKnownResource(self),
+                "/_synapse/admin": AdminRestResource(self),
+                **build_synapse_client_resource_tree(self),
+            }
+
 
             if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
@@ -211,35 +212,27 @@ class SynapseHomeServer(HomeServer):
             consent_resource = ConsentResource(self)
             if compress:
                 consent_resource = gz_wrap(consent_resource)
-            resources.update({"/_matrix/consent": consent_resource})
+            resources["/_matrix/consent"] = consent_resource
 
         if name == "federation":
-            resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+            resources[FEDERATION_PREFIX] = TransportLayerServer(self)
 
         if name == "openid":
-            resources.update(
-                {
-                    FEDERATION_PREFIX: TransportLayerServer(
-                        self, servlet_groups=["openid"]
-                    )
-                }
+            resources[FEDERATION_PREFIX] = TransportLayerServer(
+                self, servlet_groups=["openid"]
             )
 
+
         if name in ["static", "client"]:
-            resources.update(
-                {
-                    STATIC_PREFIX: StaticResource(
-                        os.path.join(os.path.dirname(synapse.__file__), "static")
-                    )
-                }
+            resources[STATIC_PREFIX] = StaticResource(
+                os.path.join(os.path.dirname(synapse.__file__), "static")
             )
+
 
         if name in ["media", "federation", "client"]:
             if self.config.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
-                resources.update(
-                    {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
-                )
+                resources |= {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
             elif name == "media":
                 raise ConfigError(
                     "'media' resource conflicts with enable_media_repo=False"
@@ -350,8 +343,9 @@ def setup(config_options):
     hs = SynapseHomeServer(
         config.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string=f"Synapse/{get_version_string(synapse)}",
     )
+
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
 
@@ -402,12 +396,10 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
 
     yield ":\n  %s" % (e.msg,)
 
-    e = e.__cause__
     indent = 1
-    while e:
+    while e := e.__cause__:
         indent += 1
         yield ":\n%s%s" % ("  " * indent, str(e))
-        e = e.__cause__
 
 
 def run(hs):

@@ -265,13 +265,7 @@ def add_sharding_to_shared_config(
     instance_map = shared_config.setdefault("instance_map", {})
 
     # Worker-type specific sharding config
-    if worker_type == "pusher":
-        shared_config.setdefault("pusher_instances", []).append(worker_name)
-
-    elif worker_type == "federation_sender":
-        shared_config.setdefault("federation_sender_instances", []).append(worker_name)
-
-    elif worker_type == "event_persister":
+    if worker_type == "event_persister":
         # Event persisters write to the events stream, so we need to update
         # the list of event stream writers
         shared_config.setdefault("stream_writers", {}).setdefault("events", []).append(
@@ -284,9 +278,14 @@ def add_sharding_to_shared_config(
             "port": worker_port,
         }
 
+    elif worker_type == "federation_sender":
+        shared_config.setdefault("federation_sender_instances", []).append(worker_name)
+
     elif worker_type == "media_repository":
         # The first configured media worker will run the media background jobs
         shared_config.setdefault("media_instance_running_background_jobs", worker_name)
+    elif worker_type == "pusher":
+        shared_config.setdefault("pusher_instances", []).append(worker_name)
 
 
 def generate_base_homeserver_config():
@@ -331,8 +330,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     ]
     with open(config_path) as file_stream:
         original_config = yaml.safe_load(file_stream)
-        original_listeners = original_config.get("listeners")
-        if original_listeners:
+        if original_listeners := original_config.get("listeners"):
             listeners += original_listeners
 
     # The shared homeserver config. The contents of which will be inserted into the
@@ -368,13 +366,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     # Read the desired worker configuration from the environment
     worker_types = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types is None:
-        # No workers, just the main process
-        worker_types = []
-    else:
-        # Split type names by comma
-        worker_types = worker_types.split(",")
-
+    worker_types = [] if worker_types is None else worker_types.split(",")
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
 
@@ -394,7 +386,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         if worker_config:
             worker_config = worker_config.copy()
         else:
-            log(worker_type + " is an unknown worker type! It will be ignored")
+            log(f"{worker_type} is an unknown worker type! It will be ignored")
             continue
 
         new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
@@ -408,7 +400,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         )
 
         # Update the shared config with any worker-type specific options
-        shared_config.update(worker_config["shared_extra_conf"])
+        shared_config |= worker_config["shared_extra_conf"]
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
@@ -429,7 +421,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
                 nginx_upstreams.setdefault(worker_type, set()).add(worker_port)
 
                 # Upstreams are named after the worker_type
-                upstream = "http://" + worker_type
+                upstream = f"http://{worker_type}"
             else:
                 upstream = "http://localhost:%d" % (worker_port,)
 
@@ -465,19 +457,21 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         worker_port += 1
 
     # Build the nginx location config blocks
-    nginx_location_config = ""
-    for endpoint, upstream in nginx_locations.items():
-        nginx_location_config += NGINX_LOCATION_CONFIG_BLOCK.format(
+    nginx_location_config = "".join(
+        NGINX_LOCATION_CONFIG_BLOCK.format(
             endpoint=endpoint,
             upstream=upstream,
         )
+        for endpoint, upstream in nginx_locations.items()
+    )
 
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
     for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
-        body = ""
-        for port in upstream_worker_ports:
-            body += "    server localhost:%d;\n" % (port,)
+        body = "".join(
+            "    server localhost:%d;\n" % (port,)
+            for port in upstream_worker_ports
+        )
 
         # Add to the list of configured upstreams
         nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
@@ -511,7 +505,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     )
 
     # Ensure the logging directory exists
-    log_dir = data_dir + "/logs"
+    log_dir = f"{data_dir}/logs"
     if not os.path.exists(log_dir):
         os.mkdir(log_dir)
 
@@ -526,7 +520,10 @@ def start_supervisord():
 
 def main(args, environ):
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
-    config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
+    config_path = environ.get(
+        "SYNAPSE_CONFIG_PATH", f"{config_dir}/homeserver.yaml"
+    )
+
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
 
     # override SYNAPSE_NO_TLS, we don't support TLS in worker mode,

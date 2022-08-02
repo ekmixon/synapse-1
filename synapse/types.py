@@ -226,7 +226,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     @classmethod
     def from_string(cls: Type[DS], s: str) -> DS:
         """Parse the string given by 's' into a structure object."""
-        if len(s) < 1 or s[0:1] != cls.SIGIL:
+        if not s or s[:1] != cls.SIGIL:
             raise SynapseError(
                 400,
                 "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL),
@@ -250,7 +250,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
 
     def to_string(self) -> str:
         """Return a string encoding the fields of the structure object."""
-        return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
+        return f"{self.SIGIL}{self.localpart}:{self.domain}"
 
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
@@ -320,7 +320,7 @@ class GroupID(DomainSpecificString):
 
 
 mxid_localpart_allowed_characters = set(
-    "_-./=" + string.ascii_lowercase + string.digits
+    f"_-./={string.ascii_lowercase}{string.digits}"
 )
 
 
@@ -350,7 +350,7 @@ UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
 #    bytes rather than strings
 #
 NON_MXID_CHARACTER_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters - {"="})),)).encode(
+    f'[^{re.escape("".join(mxid_localpart_allowed_characters - {"="}))}]'.encode(
         "ascii"
     )
 )
@@ -648,10 +648,7 @@ class StreamToken:
         new_id = int(getattr(new_token, key))
         old_id = int(getattr(self, key))
 
-        if old_id < new_id:
-            return new_token
-        else:
-            return self
+        return new_token if old_id < new_id else self
 
     def copy_and_replace(self, key, new_value) -> "StreamToken":
         return attr.evolve(self, **{key: new_value})
@@ -694,7 +691,7 @@ class ThirdPartyInstanceID(
     # set by:
     #    users = set(user)
     def __iter__(self):
-        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
+        raise ValueError(f"Attempted to iterate a {type(self).__name__}")
 
     # Because this class is a namedtuple of strings, it is deeply immutable.
     def __copy__(self):
@@ -712,7 +709,7 @@ class ThirdPartyInstanceID(
         return cls(appservice_id=bits[0], network_id=bits[1])
 
     def to_string(self):
-        return "%s|%s" % (self.appservice_id, self.network_id)
+        return f"{self.appservice_id}|{self.network_id}"
 
     __str__ = to_string
 

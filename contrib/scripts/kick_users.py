@@ -17,16 +17,14 @@ def _mkurl(template, kws):
 def main(hs, room_id, access_token, user_id_prefix, why):
     if not why:
         why = "Automated kick."
-    print(
-        "Kicking members on %s in room %s matching %s" % (hs, room_id, user_id_prefix)
-    )
+    print(f"Kicking members on {hs} in room {room_id} matching {user_id_prefix}")
     room_state_url = _mkurl(
         "$HS/_matrix/client/api/v1/rooms/$ROOM/state?access_token=$TOKEN",
         {"$HS": hs, "$ROOM": room_id, "$TOKEN": access_token},
     )
-    print("Getting room state => %s" % room_state_url)
+    print(f"Getting room state => {room_state_url}")
     res = requests.get(room_state_url)
-    print("HTTP %s" % res.status_code)
+    print(f"HTTP {res.status_code}")
     state_events = res.json()
     if "error" in state_events:
         print("FATAL")
@@ -36,20 +34,20 @@ def main(hs, room_id, access_token, user_id_prefix, why):
     kick_list = []
     room_name = room_id
     for event in state_events:
-        if not event["type"] == "m.room.member":
+        if event["type"] != "m.room.member":
             if event["type"] == "m.room.name":
                 room_name = event["content"].get("name")
             continue
-        if not event["content"].get("membership") == "join":
+        if event["content"].get("membership") != "join":
             continue
         if event["state_key"].startswith(user_id_prefix):
             kick_list.append(event["state_key"])
 
-    if len(kick_list) == 0:
+    if not kick_list:
         print("No user IDs match the prefix '%s'" % user_id_prefix)
         return
 
-    print("The following user IDs will be kicked from %s" % room_name)
+    print(f"The following user IDs will be kicked from {room_name}")
     for uid in kick_list:
         print(uid)
     doit = input("Continue? [Y]es\n")
@@ -63,12 +61,12 @@ def main(hs, room_id, access_token, user_id_prefix, why):
                 {"$HS": hs, "$UID": uid, "$ROOM": room_id, "$TOKEN": access_token},
             )
             kick_body = {"membership": "leave", "reason": why}
-            print("Kicking %s" % uid)
+            print(f"Kicking {uid}")
             res = requests.put(kick_url, data=json.dumps(kick_body))
             if res.status_code != 200:
-                print("ERROR: HTTP %s" % res.status_code)
+                print(f"ERROR: HTTP {res.status_code}")
             if res.json().get("error"):
-                print("ERROR: JSON %s" % res.json())
+                print(f"ERROR: JSON {res.json()}")
 
 
 if __name__ == "__main__":

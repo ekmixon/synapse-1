@@ -63,12 +63,14 @@ class TlsConfig(Config):
 
         # Prevent people shooting themselves in the foot here by setting it to
         # the biggest number blindly
-        if self.federation_client_minimum_tls_version == "1.3":
-            if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
-                raise ConfigError(
-                    "federation_client_minimum_tls_version cannot be 1.3, "
-                    "your OpenSSL does not support it"
-                )
+        if (
+            self.federation_client_minimum_tls_version == "1.3"
+            and getattr(SSL, "OP_NO_TLSv1_3", None) is None
+        ):
+            raise ConfigError(
+                "federation_client_minimum_tls_version cannot be 1.3, "
+                "your OpenSSL does not support it"
+            )
 
         # Whitelist of domains to not verify certificates for
         fed_whitelist_entries = config.get(
@@ -92,7 +94,7 @@ class TlsConfig(Config):
             self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation
-        custom_ca_list = config.get("federation_custom_ca_list", None)
+        custom_ca_list = config.get("federation_custom_ca_list")
 
         # Read in and parse custom CA certificates
         self.federation_ca_trust_root = None
@@ -116,9 +118,7 @@ class TlsConfig(Config):
                     cert_base = Certificate.loadPEM(content)
                     certs.append(cert_base)
                 except Exception as e:
-                    raise ConfigError(
-                        "Error parsing custom CA certificate file %s: %s" % (ca_file, e)
-                    )
+                    raise ConfigError(f"Error parsing custom CA certificate file {ca_file}: {e}")
 
             self.federation_ca_trust_root = trustRootFromCertificates(certs)
 
@@ -153,31 +153,32 @@ class TlsConfig(Config):
                 cert_pem = f.read()
         except Exception as e:
             raise ConfigError(
-                "Failed to read existing certificate file %s: %s"
-                % (self.tls_certificate_file, e)
+                f"Failed to read existing certificate file {self.tls_certificate_file}: {e}"
             )
+
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except Exception as e:
             raise ConfigError(
-                "Failed to parse existing certificate file %s: %s"
-                % (self.tls_certificate_file, e)
+                f"Failed to parse existing certificate file {self.tls_certificate_file}: {e}"
             )
 
-        if not allow_self_signed:
-            if tls_certificate.get_subject() == tls_certificate.get_issuer():
-                raise ValueError(
-                    "TLS Certificate is self signed, and this is not permitted"
-                )
+
+        if (
+            not allow_self_signed
+            and tls_certificate.get_subject() == tls_certificate.get_issuer()
+        ):
+            raise ValueError(
+                "TLS Certificate is self signed, and this is not permitted"
+            )
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
             tls_certificate.get_notAfter().decode("ascii"), "%Y%m%d%H%M%SZ"
         )
         now = datetime.utcnow()
-        days_remaining = (expires_on - now).days
-        return days_remaining
+        return (expires_on - now).days
 
     def read_certificate_from_disk(self):
         """
@@ -208,9 +209,9 @@ class TlsConfig(Config):
         tls_enabled = "" if tls_certificate_path and tls_private_key_path else "#"
 
         if not tls_certificate_path:
-            tls_certificate_path = base_key_name + ".tls.crt"
+            tls_certificate_path = f"{base_key_name}.tls.crt"
         if not tls_private_key_path:
-            tls_private_key_path = base_key_name + ".tls.key"
+            tls_private_key_path = f"{base_key_name}.tls.key"
 
         # flake8 doesn't recognise that variables are used in the below string
         _ = tls_enabled
@@ -292,9 +293,7 @@ class TlsConfig(Config):
         cert_path = self.tls_certificate_file
         logger.info("Loading TLS certificate from %s", cert_path)
         cert_pem = self.read_file(cert_path, "tls_certificate_path")
-        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-
-        return cert
+        return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
 
     def read_tls_private_key(self) -> crypto.PKey:
         """Reads the TLS private key from the configured file, and returns it

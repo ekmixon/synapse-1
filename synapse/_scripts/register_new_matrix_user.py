@@ -36,7 +36,7 @@ def request_registration(
     exit=sys.exit,
 ):
 
-    url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
+    url = f'{server_location.rstrip("/")}/_synapse/admin/v1/register'
 
     # Get the nonce
     r = requests.get(url, verify=False)
@@ -99,9 +99,7 @@ def register_new_user(user, password, server_location, shared_secret, admin, use
             default_user = None
 
         if default_user:
-            user = input("New user localpart [%s]: " % (default_user,))
-            if not user:
-                user = default_user
+            user = input(f"New user localpart [{default_user}]: ") or default_user
         else:
             user = input("New user localpart: ")
 
@@ -124,11 +122,7 @@ def register_new_user(user, password, server_location, shared_secret, admin, use
 
     if admin is None:
         admin = input("Make admin [no]: ")
-        if admin in ("y", "yes", "true"):
-            admin = True
-        else:
-            admin = False
-
+        admin = admin in ("y", "yes", "true")
     request_registration(
         user, password, server_location, shared_secret, bool(admin), user_type
     )
@@ -212,10 +206,7 @@ def main():
     else:
         secret = args.shared_secret
 
-    admin = None
-    if args.admin or args.no_admin:
-        admin = args.admin
-
+    admin = args.admin if args.admin or args.no_admin else None
     register_new_user(
         args.user, args.password, args.server_url, secret, admin, args.user_type
     )

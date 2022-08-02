@@ -179,4 +179,4 @@ class BaseHandler:
                     require_consent=False,
                 )
             except Exception as e:
-                logger.exception("Error kicking guest user: %s" % (e,))
+                logger.exception(f"Error kicking guest user: {e}")

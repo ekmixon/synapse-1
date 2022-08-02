@@ -53,11 +53,7 @@ APP_SERVICE_PREFIX = "/_matrix/app/unstable"
 
 
 def _is_valid_3pe_metadata(info):
-    if "instances" not in info:
-        return False
-    if not isinstance(info["instances"], list):
-        return False
-    return True
+    return isinstance(info["instances"], list) if "instances" in info else False
 
 
 def _is_valid_3pe_result(r, field):
@@ -73,10 +69,7 @@ def _is_valid_3pe_result(r, field):
     if "fields" not in r:
         return False
     fields = r["fields"]
-    if not isinstance(fields, dict):
-        return False
-
-    return True
+    return isinstance(fields, dict)
 
 
 class ApplicationServiceApi(SimpleHttpClient):
@@ -95,7 +88,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     async def query_user(self, service, user_id):
         if service.url is None:
             return False
-        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
+        uri = service.url + f"/users/{urllib.parse.quote(user_id)}"
         try:
             response = await self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object
@@ -111,7 +104,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     async def query_alias(self, service, alias):
         if service.url is None:
             return False
-        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
+        uri = service.url + f"/rooms/{urllib.parse.quote(alias)}"
         try:
             response = await self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object
@@ -134,12 +127,8 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
-        uri = "%s%s/thirdparty/%s/%s" % (
-            service.url,
-            APP_SERVICE_PREFIX,
-            kind,
-            urllib.parse.quote(protocol),
-        )
+        uri = f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}"
+
         try:
             response = await self.get_json(uri, fields)
             if not isinstance(response, list):
@@ -169,11 +158,8 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
-            uri = "%s%s/thirdparty/protocol/%s" % (
-                service.url,
-                APP_SERVICE_PREFIX,
-                urllib.parse.quote(protocol),
-            )
+            uri = f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}"
+
             try:
                 info = await self.get_json(uri)
 
@@ -216,7 +202,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
             txn_id = 0
 
-        uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
+        uri = service.url + f"/transactions/{urllib.parse.quote(str(txn_id))}"
 
         # Never send ephemeral events to appservices that do not support it
         if service.supports_ephemeral:
@@ -247,16 +233,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 e,
                 time_now,
                 as_client_event=True,
-                # If this is an invite or a knock membership event, and we're interested
-                # in this user, then include any stripped state alongside the event.
-                include_stripped_room_state=(
-                    e.type == EventTypes.Member
-                    and (
-                        e.membership == Membership.INVITE
-                        or e.membership == Membership.KNOCK
-                    )
-                    and service.is_interested_in_user(e.state_key)
-                ),
+                include_stripped_room_state=e.type == EventTypes.Member
+                and e.membership in [Membership.INVITE, Membership.KNOCK]
+                and service.is_interested_in_user(e.state_key),
             )
             for e in events
         ]

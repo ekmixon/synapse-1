@@ -114,8 +114,9 @@ class KeyConfig(Config):
         )
 
         suppress_key_server_warning = config.get("suppress_key_server_warning", False)
-        key_server_signing_keys_path = config.get("key_server_signing_keys_path")
-        if key_server_signing_keys_path:
+        if key_server_signing_keys_path := config.get(
+            "key_server_signing_keys_path"
+        ):
             self.key_server_signing_keys = self.read_signing_keys(
                 key_server_signing_keys_path, "key_server_signing_keys_path"
             )
@@ -131,9 +132,9 @@ class KeyConfig(Config):
 
             if not isinstance(key_servers, list):
                 raise ConfigError(
-                    "trusted_key_servers, if given, must be a list, not a %s"
-                    % (type(key_servers).__name__,)
+                    f"trusted_key_servers, if given, must be a list, not a {type(key_servers).__name__}"
                 )
+
 
             # merge the 'perspectives' config into the 'trusted_key_servers' config.
             key_servers.extend(_perspectives_to_key_servers(config))
@@ -291,7 +292,7 @@ class KeyConfig(Config):
         try:
             return read_signing_keys(signing_keys.splitlines(True))
         except Exception as e:
-            raise ConfigError("Error reading %s: %s" % (name, str(e)))
+            raise ConfigError(f"Error reading {name}: {str(e)}")
 
     def read_old_signing_keys(self, old_signing_keys):
         if old_signing_keys is None:
@@ -321,15 +322,15 @@ class KeyConfig(Config):
             )
 
         if not self.path_exists(signing_key_path):
-            print("Generating signing key file %s" % (signing_key_path,))
+            print(f"Generating signing key file {signing_key_path}")
             with open(signing_key_path, "w") as signing_key_file:
-                key_id = "a_" + random_string(4)
+                key_id = f"a_{random_string(4)}"
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
         else:
             signing_keys = self.read_file(signing_key_path, "signing_key")
             if len(signing_keys.split("\n")[0].split()) == 1:
                 # handle keys in the old format.
-                key_id = "a_" + random_string(4)
+                key_id = f"a_{random_string(4)}"
                 key = decode_signing_key_base64(
                     NACL_ED25519, key_id, signing_keys.split("\n")[0]
                 )
@@ -403,11 +404,7 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
     try:
         jsonschema.validate(key_servers, TRUSTED_KEY_SERVERS_SCHEMA)
     except jsonschema.ValidationError as e:
-        raise ConfigError(
-            "Unable to parse 'trusted_key_servers': {}".format(
-                e.message  # noqa: B306, jsonschema.ValidationError.message is a valid attribute
-            )
-        )
+        raise ConfigError(f"Unable to parse 'trusted_key_servers': {e.message}")
 
     for server in key_servers:
         server_name = server["server_name"]

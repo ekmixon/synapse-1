@@ -104,11 +104,12 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # changes. ARGH.
         def register(name: str, queue: Sized) -> None:
             LaterGauge(
-                "synapse_federation_send_queue_%s_size" % (queue_name,),
+                f"synapse_federation_send_queue_{queue_name}_size",
                 "",
                 [],
                 lambda: len(queue),
             )
+
 
         for queue_name in [
             "presence_map",
@@ -168,10 +169,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
             for key in keys[:i]:
                 del self.keyed_edu_changed[key]
 
-            live_keys = set()
-            for edu_key in self.keyed_edu_changed.values():
-                live_keys.add(edu_key)
-
+            live_keys = set(self.keyed_edu_changed.values())
             keys_to_del = [
                 edu_key for edu_key in self.keyed_edu if edu_key not in live_keys
             ]
@@ -295,15 +293,15 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         i = self.presence_destinations.bisect_right(from_token)
         j = self.presence_destinations.bisect_right(to_token) + 1
 
-        for pos, (user_id, dests) in self.presence_destinations.items()[i:j]:
-            rows.append(
-                (
-                    pos,
-                    PresenceDestinationsRow(
-                        state=self.presence_map[user_id], destinations=list(dests)
-                    ),
-                )
+        rows.extend(
+            (
+                pos,
+                PresenceDestinationsRow(
+                    state=self.presence_map[user_id], destinations=list(dests)
+                ),
             )
+            for pos, (user_id, dests) in self.presence_destinations.items()[i:j]
+        )
 
         # Fetch changes keyed edus
         i = self.keyed_edu_changed.bisect_right(from_token)
@@ -313,24 +311,22 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # stream position.
         keyed_edus = {v: k for k, v in self.keyed_edu_changed.items()[i:j]}
 
-        for ((destination, edu_key), pos) in keyed_edus.items():
-            rows.append(
-                (
-                    pos,
-                    KeyedEduRow(
-                        key=edu_key, edu=self.keyed_edu[(destination, edu_key)]
-                    ),
-                )
+        rows.extend(
+            (
+                pos,
+                KeyedEduRow(
+                    key=edu_key, edu=self.keyed_edu[(destination, edu_key)]
+                ),
             )
+            for (destination, edu_key), pos in keyed_edus.items()
+        )
 
         # Fetch changed edus
         i = self.edus.bisect_right(from_token)
         j = self.edus.bisect_right(to_token) + 1
         edus = self.edus.items()[i:j]
 
-        for (pos, edu) in edus:
-            rows.append((pos, EduRow(edu)))
-
+        rows.extend((pos, EduRow(edu)) for pos, edu in edus)
         # Sort rows based on pos
         rows.sort()
 

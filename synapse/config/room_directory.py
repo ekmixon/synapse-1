@@ -124,11 +124,14 @@ class RoomDirectoryConfig(Config):
         Returns:
             boolean: True if user is allowed to create the alias
         """
-        for rule in self._alias_creation_rules:
-            if rule.matches(user_id, room_id, [alias]):
-                return rule.action == "allow"
-
-        return False
+        return next(
+            (
+                rule.action == "allow"
+                for rule in self._alias_creation_rules
+                if rule.matches(user_id, room_id, [alias])
+            ),
+            False,
+        )
 
     def is_publishing_room_allowed(self, user_id, room_id, aliases):
         """Checks if the given user is allowed to publish the room
@@ -141,11 +144,14 @@ class RoomDirectoryConfig(Config):
         Returns:
             boolean: True if user can publish room
         """
-        for rule in self._room_list_publication_rules:
-            if rule.matches(user_id, room_id, aliases):
-                return rule.action == "allow"
-
-        return False
+        return next(
+            (
+                rule.action == "allow"
+                for rule in self._room_list_publication_rules
+                if rule.matches(user_id, room_id, aliases)
+            ),
+            False,
+        )
 
 
 class _RoomDirectoryRule:
@@ -209,12 +215,8 @@ class _RoomDirectoryRule:
 
         # If we are not given any aliases then this rule only matches if the
         # alias glob matches all aliases, which we checked above.
-        if not aliases:
-            return False
-
-        # Otherwise, we just need one alias to match
-        for alias in aliases:
-            if self._alias_regex.match(alias):
-                return True
-
-        return False
+        return (
+            any(self._alias_regex.match(alias) for alias in aliases)
+            if aliases
+            else False
+        )

@@ -53,10 +53,13 @@ def non_empty(defs):
     if classes:
         result["class"] = classes
     names = defs["names"]
-    uses = []
-    for name in names.get("Load", ()):
-        if name not in names.get("Param", ()) and name not in names.get("Store", ()):
-            uses.append(name)
+    uses = [
+        name
+        for name in names.get("Load", ())
+        if name not in names.get("Param", ())
+        and name not in names.get("Store", ())
+    ]
+
     uses.extend(defs["attrs"])
     if uses:
         result["uses"] = uses
@@ -148,10 +151,10 @@ if __name__ == "__main__":
 
     names = {}
     for filepath, defs in definitions.items():
-        defined_names(filepath + ":", defs, names)
+        defined_names(f"{filepath}:", defs, names)
 
     for filepath, defs in definitions.items():
-        used_names(filepath + ":", None, defs, names)
+        used_names(f"{filepath}:", None, defs, names)
 
     patterns = [re.compile(pattern) for pattern in args.pattern or ()]
     ignore = [re.compile(pattern) for pattern in args.ignore or ()]

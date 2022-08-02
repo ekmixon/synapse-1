@@ -16,7 +16,7 @@ def get_targets(server_name):
         yield (target, int(port))
         return
     try:
-        answers = dns.resolver.query("_matrix._tcp." + server_name, "SRV")
+        answers = dns.resolver.query(f"_matrix._tcp.{server_name}", "SRV")
         for srv in answers:
             yield (srv.target, srv.port)
     except dns.resolver.NXDOMAIN:
@@ -50,7 +50,7 @@ def main():
     for target, port in get_targets(server_name):
         try:
             keys = get_server_keys(server_name, target, port)
-            print("Using keys from https://%s:%s/_matrix/key/v1" % (target, port))
+            print(f"Using keys from https://{target}:{port}/_matrix/key/v1")
             write_signing_keys(sys.stdout, keys.values())
             break
         except Exception:
@@ -62,10 +62,10 @@ def main():
         try:
             key = keys[key_id]
             verify_signed_json(json_to_check, args.signature_name, key)
-            print("PASS %s" % (key_id,))
+            print(f"PASS {key_id}")
         except Exception:
-            logging.exception("Check for key %s failed" % (key_id,))
-            print("FAIL %s" % (key_id,))
+            logging.exception(f"Check for key {key_id} failed")
+            print(f"FAIL {key_id}")
 
 
 if __name__ == "__main__":

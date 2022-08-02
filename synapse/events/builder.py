@@ -209,11 +209,11 @@ class EventBuilderFactory:
         Returns:
             EventBuilder
         """
-        v = KNOWN_ROOM_VERSIONS.get(room_version)
-        if not v:
+        if v := KNOWN_ROOM_VERSIONS.get(room_version):
+            return self.for_room_version(v, key_values)
+        else:
             # this can happen if support is withdrawn for a room version
             raise UnsupportedRoomVersionError()
-        return self.for_room_version(v, key_values)
 
     def for_room_version(
         self, room_version: RoomVersion, key_values: dict

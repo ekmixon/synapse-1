@@ -420,7 +420,7 @@ def setup_sentry(hs):
     with sentry_sdk.configure_scope() as scope:
         scope.set_tag("matrix_server_name", hs.config.server_name)
 
-        app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
+        app = hs.config.worker_app or "synapse.app.homeserver"
         name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)

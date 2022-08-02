@@ -37,24 +37,20 @@ class AdminHandler(BaseHandler):
         self.state_store = self.storage.state
 
     async def get_whois(self, user: UserID) -> JsonDict:
-        connections = []
-
         sessions = await self.store.get_user_ip_and_agents(user)
-        for session in sessions:
-            connections.append(
-                {
-                    "ip": session["ip"],
-                    "last_seen": session["last_seen"],
-                    "user_agent": session["user_agent"],
-                }
-            )
+        connections = [
+            {
+                "ip": session["ip"],
+                "last_seen": session["last_seen"],
+                "user_agent": session["user_agent"],
+            }
+            for session in sessions
+        ]
 
-        ret = {
+        return {
             "user_id": user.to_string(),
             "devices": {"": {"sessions": [{"connections": connections}]}},
         }
-
-        return ret
 
     async def get_user(self, user: UserID) -> Optional[JsonDict]:
         """Function to get user details"""
@@ -172,10 +168,10 @@ class AdminHandler(BaseHandler):
 
                 # Update the extremity tracking dicts
                 for event in events:
-                    # Check if we have any prev events that haven't been
-                    # processed yet, and add those to the appropriate dicts.
-                    unseen_events = set(event.prev_event_ids()) - written_events
-                    if unseen_events:
+                    if (
+                        unseen_events := set(event.prev_event_ids())
+                        - written_events
+                    ):
                         event_to_unseen_prevs[event.event_id] = unseen_events
                         for unseen in unseen_events:
                             unseen_to_child_events.setdefault(unseen, set()).add(

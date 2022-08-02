@@ -77,11 +77,7 @@ class ApplicationService:
             raise Exception("application service ID cannot contain '|' character")
 
         # .protocols is a publicly visible field
-        if protocols:
-            self.protocols = set(protocols)
-        else:
-            self.protocols = set()
-
+        self.protocols = set(protocols) if protocols else set()
         self.rate_limited = rate_limited
 
     def _check_namespaces(self, namespaces):
@@ -106,8 +102,7 @@ class ApplicationService:
                     raise ValueError("Expected dict regex for ns '%s'" % ns)
                 if not isinstance(regex_obj.get("exclusive"), bool):
                     raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
-                group_id = regex_obj.get("group_id")
-                if group_id:
+                if group_id := regex_obj.get("group_id"):
                     if not isinstance(group_id, str):
                         raise ValueError(
                             "Expected string for 'group_id' in ns '%s'" % ns
@@ -132,14 +127,17 @@ class ApplicationService:
         return namespaces
 
     def _matches_regex(self, test_string: str, namespace_key: str) -> Optional[Match]:
-        for regex_obj in self.namespaces[namespace_key]:
-            if regex_obj["regex"].match(test_string):
-                return regex_obj
-        return None
+        return next(
+            (
+                regex_obj
+                for regex_obj in self.namespaces[namespace_key]
+                if regex_obj["regex"].match(test_string)
+            ),
+            None,
+        )
 
     def _is_exclusive(self, ns_key: str, test_string: str) -> bool:
-        regex_obj = self._matches_regex(test_string, ns_key)
-        if regex_obj:
+        if regex_obj := self._matches_regex(test_string, ns_key):
             return regex_obj["exclusive"]
         return False
 
@@ -183,11 +181,7 @@ class ApplicationService:
             room_id, on_invalidate=cache_context.invalidate
         )
 
-        # check joined member events
-        for user_id in member_list:
-            if self.is_interested_in_user(user_id):
-                return True
-        return False
+        return any(self.is_interested_in_user(user_id) for user_id in member_list)
 
     def _matches_room_id(self, event: EventBase) -> bool:
         if hasattr(event, "room_id"):
@@ -201,10 +195,7 @@ class ApplicationService:
             return False
 
         alias_list = await store.get_aliases_for_room(event.room_id)
-        for alias in alias_list:
-            if self.is_interested_in_alias(alias):
-                return True
-        return False
+        return any(self.is_interested_in_alias(alias) for alias in alias_list)
 
     async def is_interested(
         self, event: EventBase, store: Optional["DataStore"] = None
@@ -228,10 +219,7 @@ class ApplicationService:
             return True
 
         # This will check the store, so should be run last
-        if await self._matches_aliases(event, store):
-            return True
-
-        return False
+        return bool(await self._matches_aliases(event, store))
 
     @cached(num_args=1)
     async def is_interested_in_presence(
@@ -317,7 +305,7 @@ class ApplicationService:
         dict_copy = self.__dict__.copy()
         dict_copy["token"] = "<redacted>"
         dict_copy["hs_token"] = "<redacted>"
-        return "ApplicationService: %s" % (dict_copy,)
+        return f"ApplicationService: {dict_copy}"
 
 
 class AppServiceTransaction:

@@ -189,7 +189,7 @@ class FilterCollection:
         self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
-        return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
+        return f"<FilterCollection {json.dumps(self._filter_json)}>"
 
     def get_filter_json(self):
         return self._filter_json
@@ -326,22 +326,19 @@ class Filter:
         }
 
         for name, match_func in literal_keys.items():
-            not_name = "not_%s" % (name,)
+            not_name = f"not_{name}"
             disallowed_values = getattr(self, not_name)
             if any(map(match_func, disallowed_values)):
                 return False
 
             allowed_values = getattr(self, name)
-            if allowed_values is not None:
-                if not any(map(match_func, allowed_values)):
-                    return False
-
-        contains_url_filter = self.filter_json.get("contains_url")
-        if contains_url_filter is not None:
-            if contains_url_filter != contains_url:
+            if allowed_values is not None and not any(
+                map(match_func, allowed_values)
+            ):
                 return False
 
-        return True
+        contains_url_filter = self.filter_json.get("contains_url")
+        return contains_url_filter is None or contains_url_filter == contains_url
 
     def filter_rooms(self, room_ids):
         """Apply the 'rooms' filter to a given list of rooms.
@@ -391,11 +388,10 @@ class Filter:
 
 
 def _matches_wildcard(actual_value, filter_value):
-    if filter_value.endswith("*"):
-        type_prefix = filter_value[:-1]
-        return actual_value.startswith(type_prefix)
-    else:
+    if not filter_value.endswith("*"):
         return actual_value == filter_value
+    type_prefix = filter_value[:-1]
+    return actual_value.startswith(type_prefix)
 
 
 DEFAULT_FILTER_COLLECTION = FilterCollection({})

@@ -132,7 +132,7 @@ for dep in itertools.chain(
 ):
     if '"' in dep:
         raise Exception(
-            "Dependency `%s` contains double-quote; use single-quotes instead" % (dep,)
+            f"Dependency `{dep}` contains double-quote; use single-quotes instead"
         )
 
 
@@ -145,9 +145,9 @@ class DependencyException(Exception):
     def message(self):
         return "\n".join(
             [
-                "Missing Requirements: %s" % (", ".join(self.dependencies),),
+                f'Missing Requirements: {", ".join(self.dependencies)}',
                 "To install run:",
-                "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
+                f'    pip install --upgrade --force {" ".join(self.dependencies)}',
                 "",
             ]
         )
@@ -162,24 +162,16 @@ def check_requirements(for_feature=None):
     deps_needed = []
     errors = []
 
-    if for_feature:
-        reqs = CONDITIONAL_REQUIREMENTS[for_feature]
-    else:
-        reqs = REQUIREMENTS
-
+    reqs = CONDITIONAL_REQUIREMENTS[for_feature] if for_feature else REQUIREMENTS
     for dependency in reqs:
         try:
             _check_requirement(dependency)
         except VersionConflict as e:
             deps_needed.append(dependency)
             errors.append(
-                "Needed %s, got %s==%s"
-                % (
-                    dependency,
-                    e.dist.project_name,  # type: ignore[attr-defined] # noqa
-                    e.dist.version,  # type: ignore[attr-defined] # noqa
-                )
+                f"Needed {dependency}, got {e.dist.project_name}=={e.dist.version}"
             )
+
         except DistributionNotFound:
             deps_needed.append(dependency)
             if for_feature:
@@ -188,7 +180,7 @@ def check_requirements(for_feature=None):
                     % (dependency, for_feature)
                 )
             else:
-                errors.append("Needed %s but it was not installed" % (dependency,))
+                errors.append(f"Needed {dependency} but it was not installed")
 
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be
@@ -201,13 +193,9 @@ def check_requirements(for_feature=None):
             except VersionConflict as e:
                 deps_needed.append(dependency)
                 errors.append(
-                    "Needed optional %s, got %s==%s"
-                    % (
-                        dependency,
-                        e.dist.project_name,  # type: ignore[attr-defined] # noqa
-                        e.dist.version,  # type: ignore[attr-defined] # noqa
-                    )
+                    f"Needed optional {dependency}, got {e.dist.project_name}=={e.dist.version}"
                 )
+
             except DistributionNotFound:
                 # If it's not found, we don't care
                 pass

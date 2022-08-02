@@ -40,8 +40,7 @@ def encode_base64(input_bytes):
     input_len = len(input_bytes)
     output_len = 4 * ((input_len + 2) // 3) + (input_len + 2) % 3 - 2
     output_bytes = base64.b64encode(input_bytes)
-    output_string = output_bytes[:output_len].decode("ascii")
-    return output_string
+    return output_bytes[:output_len].decode("ascii")
 
 
 def encode_canonical_json(value):
@@ -66,7 +65,7 @@ def sign_json(
     signed = signing_key.sign(encode_canonical_json(json_object))
     signature_base64 = encode_base64(signed.signature)
 
-    key_id = "%s:%s" % (signing_key.alg, signing_key.version)
+    key_id = f"{signing_key.alg}:{signing_key.version}"
     signatures.setdefault(signing_name, {})[key_id] = signature_base64
 
     json_object["signatures"] = signatures
@@ -85,11 +84,7 @@ def request(
     content: Optional[str],
 ) -> requests.Response:
     if method is None:
-        if content is None:
-            method = "GET"
-        else:
-            method = "POST"
-
+        method = "GET" if content is None else "POST"
     json_to_sign = {
         "method": method,
         "uri": path,
@@ -107,10 +102,10 @@ def request(
     for key, sig in signed_json["signatures"][origin_name].items():
         header = 'X-Matrix origin=%s,key="%s",sig="%s"' % (origin_name, key, sig)
         authorization_headers.append(header.encode("ascii"))
-        print("Authorization: %s" % header, file=sys.stderr)
+        print(f"Authorization: {header}", file=sys.stderr)
 
-    dest = "matrix://%s%s" % (destination, path)
-    print("Requesting %s" % dest, file=sys.stderr)
+    dest = f"matrix://{destination}{path}"
+    print(f"Requesting {dest}", file=sys.stderr)
 
     s = requests.Session()
     s.mount("matrix://", MatrixConnectionAdapter())
@@ -241,8 +236,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
 
         # try a .well-known lookup
         if not skip_well_known:
-            well_known = MatrixConnectionAdapter.get_well_known(s)
-            if well_known:
+            if well_known := MatrixConnectionAdapter.get_well_known(s):
                 return MatrixConnectionAdapter.lookup(well_known, skip_well_known=True)
 
         try:
@@ -253,8 +247,8 @@ class MatrixConnectionAdapter(HTTPAdapter):
 
     @staticmethod
     def get_well_known(server_name):
-        uri = "https://%s/.well-known/matrix/server" % (server_name,)
-        print("fetching %s" % (uri,), file=sys.stderr)
+        uri = f"https://{server_name}/.well-known/matrix/server"
+        print(f"fetching {uri}", file=sys.stderr)
 
         try:
             resp = requests.get(uri)
@@ -268,11 +262,11 @@ class MatrixConnectionAdapter(HTTPAdapter):
             if "m.server" not in parsed_well_known:
                 raise Exception("Missing key 'm.server'")
             new_name = parsed_well_known["m.server"]
-            print("well-known lookup gave %s" % (new_name,), file=sys.stderr)
+            print(f"well-known lookup gave {new_name}", file=sys.stderr)
             return new_name
 
         except Exception as e:
-            print("Invalid response from %s: %s" % (uri, e), file=sys.stderr)
+            print(f"Invalid response from {uri}: {e}", file=sys.stderr)
         return None
 
     def get_connection(self, url, proxies=None):
@@ -280,7 +274,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
 
         (host, port) = self.lookup(parsed.netloc)
         netloc = "%s:%d" % (host, port)
-        print("Connecting to %s" % (netloc,), file=sys.stderr)
+        print(f"Connecting to {netloc}", file=sys.stderr)
         url = urlparse.urlunparse(
             ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
         )

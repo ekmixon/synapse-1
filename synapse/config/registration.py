@@ -59,7 +59,7 @@ class RegistrationConfig(Config):
         self.auto_join_rooms = config.get("auto_join_rooms", [])
         for room_alias in self.auto_join_rooms:
             if not RoomAlias.is_valid(room_alias):
-                raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
+                raise ConfigError(f"Invalid auto_join_rooms entry {room_alias}")
 
         # Options for creating auto-join rooms if they do not exist yet.
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
@@ -95,14 +95,13 @@ class RegistrationConfig(Config):
                 raise ConfigError("Invalid value for autocreate_auto_join_room_preset")
             # If the preset requires invitations to be sent, ensure there's a
             # configured user to send them from.
-            if self.auto_join_room_requires_invite:
-                if not mxid_localpart:
-                    raise ConfigError(
-                        "The configuration option `auto_join_mxid_localpart` is required if "
-                        "`autocreate_auto_join_room_preset` is set to private_chat or trusted_private_chat, such that "
-                        "Synapse knows who to send invitations from. Please "
-                        "configure `auto_join_mxid_localpart`."
-                    )
+            if self.auto_join_room_requires_invite and not mxid_localpart:
+                raise ConfigError(
+                    "The configuration option `auto_join_mxid_localpart` is required if "
+                    "`autocreate_auto_join_room_preset` is set to private_chat or trusted_private_chat, such that "
+                    "Synapse knows who to send invitations from. Please "
+                    "configure `auto_join_mxid_localpart`."
+                )
 
         self.auto_join_rooms_for_guests = config.get("auto_join_rooms_for_guests", True)
 

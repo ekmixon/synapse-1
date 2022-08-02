@@ -56,6 +56,13 @@ def get_recent_users(txn: LoggingTransaction, since_ms: int) -> List[UserInfo]:
 
     user_infos = [UserInfo(user_id, creation_ts) for user_id, creation_ts in txn]
 
+    sql = """
+            SELECT room_id, canonical_alias, name, join_rules
+            FROM local_current_membership
+            INNER JOIN room_stats_state USING (room_id)
+            WHERE user_id = ? AND membership = 'join'
+        """
+
     for user_info in user_infos:
         user_info.emails = DatabasePool.simple_select_onecol_txn(
             txn,
@@ -63,13 +70,6 @@ def get_recent_users(txn: LoggingTransaction, since_ms: int) -> List[UserInfo]:
             keyvalues={"user_id": user_info.user_id, "medium": "email"},
             retcol="address",
         )
-
-        sql = """
-            SELECT room_id, canonical_alias, name, join_rules
-            FROM local_current_membership
-            INNER JOIN room_stats_state USING (room_id)
-            WHERE user_id = ? AND membership = 'join'
-        """
 
         txn.execute(sql, (user_info.user_id,))
         for room_id, canonical_alias, name, join_rules in txn:
